@@ -128,6 +128,13 @@ function isMissingDatabaseSchema(error: unknown): boolean {
     && (error.code === "42703" || error.code === "42P01");
 }
 
+function isInsufficientAiCredits(error: unknown): boolean {
+  return typeof error === "object"
+    && error !== null
+    && "status" in error
+    && error.status === 402;
+}
+
 // ─── Plan generation prompt ───────────────────────────────────────────────────
 function buildPlanPrompt(d: z.infer<typeof PlanDataSchema>): string {
   const budgetTotal = parseBudget(d.budgetTotal ?? "");
@@ -238,10 +245,13 @@ export async function POST(request: Request) {
     if (generatingPlan) {
       const schemaOutdated = failureStage === "saving the locked plan"
         && isMissingDatabaseSchema(err);
+      const insufficientCredits = isInsufficientAiCredits(err);
       const error = failureStage === "AI plan generation"
         ? "The AI could not finish a valid plan. Your answers are still here; please retry."
         : failureStage === "contingency generation"
-          ? "The plan could not finish preparing its Plan B contingencies. Your answers are still here; please retry."
+          ? insufficientCredits
+            ? "The AI service could not afford the Plan B response. Check your OpenRouter credits or choose a lower-cost model, then retry. Your answers are still here."
+            : "The plan could not finish preparing its Plan B contingencies. Your answers are still here; please retry."
           : failureStage === "saving the locked plan"
             ? schemaOutdated
               ? "The database schema needs an update before plans can be saved. Run npm run db:migrate against the database configured for this app, then retry."
@@ -253,6 +263,7 @@ export async function POST(request: Request) {
         status: failureStage === "AI plan generation"
           || failureStage === "contingency generation"
           || schemaOutdated
+          || insufficientCredits
           ? 503
           : 500,
       });

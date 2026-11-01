@@ -66,6 +66,10 @@ function isRateLimitError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 429;
 }
 
+function isInsufficientCreditsError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "status" in error && error.status === 402;
+}
+
 function retryDelay(error: unknown): number {
   const headers = typeof error === "object" && error !== null && "headers" in error
     ? error.headers
@@ -145,6 +149,10 @@ export async function llmJson<T>(
     try {
       return await attempt(model);
     } catch (firstError) {
+      if (isInsufficientCreditsError(firstError)) {
+        console.warn("[llmJson] Provider credits cannot cover this request; skipping the fallback attempt.");
+        throw firstError;
+      }
       console.warn(`[llmJson] First attempt failed with ${model}, retrying with fallback ${fallbackModel}.`);
       if (isRateLimitError(firstError)) await wait(retryDelay(firstError));
       try {

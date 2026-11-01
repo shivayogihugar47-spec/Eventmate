@@ -501,6 +501,29 @@ describe("RUN risk generation", () => {
     mocks.llmJson.mockReset();
   });
 
+  it("caps contingency output tokens while generating event-specific risks", async () => {
+    mocks.llmJson.mockResolvedValue({
+      risks: [
+        { title: "Rain during outdoor setup", triggerType: "WEATHER", likelihood: "medium", backupAction: [{ type: "reassign", taskId: ids.setup, owner: "Organizer" }] },
+        { title: "Catering delivery delay", triggerType: "DELAY", likelihood: "medium", backupAction: [{ type: "shift", taskId: ids.caterer, minutes: 15 }] },
+        { title: "Catering vendor cancellation", triggerType: "VENDOR_CANCELLED", likelihood: "low", backupAction: [{ type: "reassign", taskId: ids.caterer, owner: "Organizer" }] },
+        { title: "Guest count increases", triggerType: "GUEST_COUNT", likelihood: "low", backupAction: [{ type: "add_task", task: "Confirm additional seating", startAt: "2026-10-10T09:00:00.000Z", durationMin: 15, owner: "Organizer", dependsOn: [] }] },
+        { title: "Ceremony venue access delayed", triggerType: "VENUE_ISSUE", likelihood: "low", backupAction: [{ type: "reassign", taskId: ids.ceremony, owner: "Organizer" }] },
+      ],
+    });
+    const plan = makePlan([
+      makeTask(ids.setup, "Outdoor setup", "2026-10-10T09:00:00.000Z", 30),
+      makeTask(ids.caterer, "Catering", "2026-10-10T09:30:00.000Z", 30, [ids.setup]),
+      makeTask(ids.ceremony, "Ceremony close", "2026-10-10T10:00:00.000Z", 30, [ids.caterer]),
+    ]);
+
+    const risks = await generateRisks(plan);
+
+    expect(risks).toHaveLength(5);
+    expect(risks.every((risk) => risk.status === "ready")).toBe(true);
+    expect(mocks.llmJson.mock.calls[0][3]).toEqual({ maxTokens: 3000 });
+  });
+
   it("does not substitute canned contingencies when the risk model fails", async () => {
     mocks.llmJson.mockRejectedValue(new Error("Model returned invalid contingency JSON"));
     const plan = makePlan([

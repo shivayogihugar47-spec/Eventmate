@@ -46,6 +46,7 @@ export async function generateRisks(plan: RunPlan): Promise<PlanRisk[]> {
       }),
     }],
     RiskSchema,
+    { maxTokens: 3000 },
   );
 
   return result.risks.map((risk) => {
