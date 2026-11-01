@@ -179,8 +179,8 @@ describe("RUN change intake", () => {
   it("returns multiple validated changes from one message", async () => {
     mocks.llmJson.mockResolvedValue({
       changes: [
-        { type: "DELAY", taskId: ids.caterer, minutes: 40, note: "Caterer late" },
-        { type: "GUEST_COUNT", guestCount: 130, note: "30 more guests" },
+        { type: "DELAY", taskName: "Caterer", minutes: "40 minutes", note: "Caterer late" },
+        { type: "GUEST_COUNT", guestCount: "130 guests", note: "30 more guests" },
       ],
       clarifyingQuestion: null,
     });
@@ -191,6 +191,31 @@ describe("RUN change intake", () => {
     );
 
     expect(changes.changes.map((change) => change.type)).toEqual(["DELAY", "GUEST_COUNT"]);
+    expect(changes.changes[0]).toMatchObject({ taskId: ids.caterer, minutes: 40 });
+    expect(changes.changes[1]).toMatchObject({ guestCount: 130 });
+    const [systemPrompt, messages] = mocks.llmJson.mock.calls[0];
+    expect(systemPrompt).toContain("everyday, simple English");
+    expect(systemPrompt).toContain("30 more guests");
+    expect(messages[0].content).toContain("Catering");
+    expect(messages[0].content).toContain(ids.caterer);
+  });
+
+  it("understands a clear plain-English delay without requiring a model response", async () => {
+    const result = await parseChangeText(
+      "Caterer is late by 40 minutes",
+      makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]),
+    );
+
+    expect(result).toEqual({
+      changes: [{
+        type: "DELAY",
+        taskId: ids.caterer,
+        minutes: 40,
+        note: "Catering setup is delayed by 40 minutes",
+      }],
+      clarifyingQuestion: null,
+    });
+    expect(mocks.llmJson).not.toHaveBeenCalled();
   });
 
   it("asks for the missing duration instead of returning an invalid request for 'Caterer is hours late'", async () => {
@@ -246,12 +271,12 @@ describe("RUN change intake", () => {
     }] as never));
 
     const result = await parseChangeText(
-      "Caterer is 1 hour late",
+      "Caterer is 1 hour late, and the guest count may also change",
       makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]),
     );
 
     expect(result.changes).toEqual([]);
-    expect(result.clarifyingQuestion).toBe("I couldn't read that update clearly. Which task changed, and what is the new time or amount?");
+    expect(result.clarifyingQuestion).toBe("I couldn't safely map that update to the plan. Which task changed, and what should be different?");
   });
 
   it("uses a verified deterministic schedule fallback when AI options remain invalid", async () => {
@@ -296,7 +321,7 @@ describe("RUN change intake", () => {
       new Request(`https://eventmate.test/api/run/${eventId}/intake`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: 1, text: "Caterer is 40 minutes late" }),
+        body: JSON.stringify({ version: 1, text: "Caterer is 40 minutes late, and 30 more guests are coming" }),
       }),
       { params: Promise.resolve({ eventId }) },
     );
