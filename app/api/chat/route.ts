@@ -178,7 +178,12 @@ export async function POST(request: Request) {
           : failureStage === "saving the locked plan"
             ? "The plan was generated but could not be saved. Check the database connection, then retry."
             : "Unable to generate the event plan. Your answers are saved; please retry.";
-      return NextResponse.json({ error }, { status: 500 });
+      return NextResponse.json({
+        error,
+        ...(process.env.NODE_ENV === "development" && err instanceof Error
+          ? { detail: err.message.slice(0, 500) }
+          : {}),
+      }, { status: 500 });
     }
     return NextResponse.json(buildNextEventQuestion(messages));
   }

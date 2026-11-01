@@ -1041,10 +1041,14 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
         body:JSON.stringify({messages:history,generatePlan:true,planData:collectedData})});
       const payload = await res.json().catch(() => ({})) as {
         error?:string;
+        detail?:string;
         plan?:RunPlan;
         run?:{eventId:string;organizerToken:string;version:number;ownerLinks:{owner:string;token:string;taskIds:string[];expiresAt:string}[]};
       };
-      if (!res.ok) throw new Error(payload.error ?? "Unable to generate the plan.");
+      if (!res.ok) {
+        const message = payload.error ?? "Unable to generate the plan.";
+        throw new Error(payload.detail ? `${message} (${payload.detail})` : message);
+      }
       if (!payload.plan || !payload.run?.eventId || !payload.run.organizerToken) {
         throw new Error("The server returned an incomplete plan. Your answers are saved; please retry.");
       }
