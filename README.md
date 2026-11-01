@@ -71,6 +71,10 @@ CHANGE -> INTAKE -> IMPACT ENGINE -> OPTION GENERATOR -> VERIFIER
 
 Task owners use expiring, unguessable links scoped to their assigned tasks. Their Done and Delay actions use the same event versioning and verification rules. If the network drops, organizer updates are queued locally and retried after reconnecting.
 
+## Local vendor discovery
+
+The plan-writing model is instructed not to invent real business names or claim vendor availability. The plan's vendor ideas are planning categories only. The Vendors tab searches the selected city through Nominatim geocoding and the OpenStreetMap Overpass API, then shows mapped places with any available contact details and map links. Results are attributed to OpenStreetMap and are not endorsements: directory coverage, services, prices, and availability can be incomplete or out of date, so organizers should confirm them directly.
+
 ---
 
 ## Manual Setup Steps

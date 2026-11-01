@@ -117,7 +117,7 @@ Return ONLY this JSON structure:
   "highlights": ["string1","string2","string3","string4"],
   "timeline": [{"time":"HH:MM AM/PM","task":"...","owner":"...","description":"...","status":"pending","icon":"lucide-name"}],
   "budgetBreakdown": [{"category":"...","allocated":0,"percentage":0,"icon":"lucide-name","notes":"..."}],
-  "vendors": [{"name":"...","category":"...","description":"...","status":"pending","priority":"high","icon":"lucide-name","estimatedCost":"₹X–Y"}],
+  "vendors": [{"name":"Generic service category","category":"...","description":"...","status":"pending","priority":"high","icon":"lucide-name","estimatedCost":"₹X–Y"}],
   "checklist": [{"task":"...","dueDate":"X weeks before","done":false,"icon":"lucide-name","category":"..."}]
 }
 
@@ -127,7 +127,8 @@ Requirements:
 - highlights: 4 exciting features specific to this event
 - timeline: exactly 12 items covering full day from setup to wrap-up
 - budgetBreakdown: exactly 8 categories, percentages sum to 100, amounts sum to budgetTotal
-- vendors: exactly 10 vendors with realistic descriptions and cost estimates for ${d.city}
+- vendors: exactly 10 generic vendor categories with planning descriptions and rough cost estimates; use names like "Wedding venue search" or "Local catering options", never invent a real business name, address, phone number, website, or claim a business is available
+- You do not have live web search. Real local business listings are searched separately for the selected city; do not present generated vendor ideas as real businesses
 - checklist: exactly 12 action items across categories: Venue, Catering, Entertainment, Decor, Guest Management, Documentation
 - Use occasion-specific details to tailor the timeline, vendors, checklist, and guest experience. For corporate events, account for the format, objective, duration, and AV/production needs; for weddings, account for ceremony traditions and personal moments.
 - Make everything specific to ${d.eventType} in ${d.city} with ${d.theme} theme`;

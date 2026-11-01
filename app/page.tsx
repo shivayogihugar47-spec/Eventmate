@@ -8,9 +8,10 @@ import {
   CheckCircle2, Camera, Music, Utensils, Flower2, Car,
   Building2, Gift, Heart, PartyPopper, Mic, Package, Lightbulb,
   Wand2, Gem, Cake, Trees, ArrowRight, RotateCcw, Check, ChevronLeft, ChevronRight,
-  IndianRupee as Rupee, type LucideIcon,
+  IndianRupee as Rupee, Search, ExternalLink, Phone, Globe2, LoaderCircle,
+  AlertCircle, Store, type LucideIcon,
 } from "lucide-react";
-import type { EventPlan, AssistantCard, TimelineItem, BudgetItem, VendorItem, ChecklistItem } from "./api/chat/route";
+import type { EventPlan, AssistantCard, TimelineItem, BudgetItem, ChecklistItem } from "./api/chat/route";
 import { useDiya } from "@/lib/diyaStore";
 import { buildNextEventQuestion, getEventQuestionFlow, type EventCollectedData } from "@/lib/eventQuestions";
 import { formatINR } from "@/lib/budget";
@@ -391,40 +392,194 @@ function BudgetSection({ items, total }:{ items:BudgetItem[]; total:number }) {
   );
 }
 
-function VendorsSection({ vendors }:{ vendors:VendorItem[] }) {
-  const VS: Record<string,{bg:string;text:string}> = {
-    pending:{bg:"#F3F4F6",text:"#6B7280"}, contacted:{bg:"#DBEAFE",text:"#1D4ED8"}, booked:{bg:"#D1FAE5",text:"#065F46"},
-  };
-  const VP: Record<string,{bg:string;text:string}> = {
-    high:{bg:"#FEE2E2",text:"#991B1B"}, medium:{bg:"#FEF3C7",text:"#92400E"}, low:{bg:"#F3F4F6",text:"#6B7280"},
-  };
+interface LocalVendor {
+  id: string;
+  name: string;
+  category: string;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  mapUrl: string;
+}
+
+function VendorsSection({ city: initialCity }:{ city:string }) {
+  const [city, setCity] = useState(initialCity);
+  const [searchedCity, setSearchedCity] = useState("");
+  const [vendors, setVendors] = useState<LocalVendor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  const search = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setError("");
+    setVendors([]);
+    setActiveCategory("All");
+    try {
+      const response = await fetch(`/api/vendors?city=${encodeURIComponent(trimmed)}`);
+      const result = await response.json() as { error?:string; city?:string; results?:LocalVendor[] };
+      if (!response.ok) throw new Error(result.error ?? "Unable to search local listings.");
+      setVendors(result.results ?? []);
+      setSearchedCity(result.city ?? trimmed);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to search local listings. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setCity(initialCity);
+    void search(initialCity);
+  }, [initialCity, search]);
+
+  const categories = ["All", ...Array.from(new Set(vendors.map((vendor) => vendor.category)))];
+  const visibleVendors = activeCategory === "All"
+    ? vendors
+    : vendors.filter((vendor) => vendor.category === activeCategory);
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-      {vendors.map((v,i)=>{
-        const I=getIcon(v.icon); const p=PAL[i%PAL.length];
-        const vs=VS[v.status]??VS.pending; const vp=VP[v.priority]??VP.medium;
-        return (
-          <motion.div key={i} initial={{opacity:0,scale:0.96}} animate={{opacity:1,scale:1}} transition={{delay:i*0.04}}
-            className="bg-white border border-[#E5E7EB] rounded-2xl p-3.5 flex items-start gap-3 hover:shadow-md hover:border-[#6366F1]/20 transition-all">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:p.bg}}>
-              <I size={16} style={{color:p.fg}}/>
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-[#E5E0D3] bg-[#F8F7F2] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex-1">
+            <span className="mb-1.5 block text-xs font-bold text-[#34483F]">Search by city</span>
+            <span className="flex items-center gap-2 rounded-xl border border-[#D8D6CD] bg-white px-3 focus-within:border-[#A77D2B]">
+              <MapPin size={15} className="shrink-0 text-[#A77D2B]"/>
+              <input
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void search(city);
+                  }
+                }}
+                aria-label="City for local vendor search"
+                placeholder="Enter a city"
+                className="h-11 min-w-0 flex-1 border-0 bg-transparent text-sm text-[#202B27] outline-none placeholder:text-[#9CA39D] focus:ring-0"
+              />
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={() => void search(city)}
+            disabled={loading || !city.trim()}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#214E43] px-5 text-sm font-bold text-white transition-colors hover:bg-[#173D34] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? <LoaderCircle size={15} className="animate-spin"/> : <Search size={15}/>}
+            {loading ? "Searching…" : "Find local vendors"}
+          </button>
+        </div>
+        <div className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-[#6B756D]">
+          <Store size={13} className="mt-0.5 shrink-0 text-[#A77D2B]"/>
+          <p>Real place listings near the city center, sourced from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="font-bold underline underline-offset-2">OpenStreetMap contributors</a>. Listings may be incomplete—confirm services, availability, and pricing directly.</p>
+        </div>
+      </div>
+
+      {error && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#F0C8BD] bg-[#FFF6F2] px-4 py-3 text-sm text-[#8F3D2B]">
+          <AlertCircle size={16} className="mt-0.5 shrink-0"/>{error}
+        </div>
+      )}
+
+      {loading && (
+        <div className="grid gap-3 sm:grid-cols-2" aria-label="Searching local vendors">
+          {[0,1,2,3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl border border-[#E8E6DE] bg-white"/>)}
+        </div>
+      )}
+
+      {!loading && !error && vendors.length > 0 && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-display text-lg font-extrabold text-[#202B27]">Local options in {searchedCity}</h3>
+              <p className="mt-0.5 text-xs text-[#778078]">{vendors.length} mapped places · around 15 km from the city center</p>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[#111827]">{v.name}</p>
-              {(v as VendorItem & {description?:string}).description && (
-                <p className="text-xs text-[#6B7280] mt-0.5 leading-snug">{(v as VendorItem & {description?:string}).description}</p>
-              )}
-              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{background:vs.bg,color:vs.text}}>{v.status}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{background:vp.bg,color:vp.text}}>{v.priority}</span>
-                {(v as VendorItem & {estimatedCost?:string}).estimatedCost && (
-                  <span className="text-[10px] text-[#9CA3AF]">{(v as VendorItem & {estimatedCost?:string}).estimatedCost}</span>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        );
-      })}
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#52645A] underline underline-offset-2">© OpenStreetMap contributors</a>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {categories.map((category) => (
+              <button
+                type="button"
+                key={category}
+                onClick={() => setActiveCategory(category)}
+                className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
+                  activeCategory === category
+                    ? "bg-[#214E43] text-white"
+                    : "border border-[#E5E0D3] bg-white text-[#52645A] hover:border-[#A77D2B]/50"
+                }`}
+              >
+                {category === "All" ? `All (${vendors.length})` : category}
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {visibleVendors.map((vendor, index) => {
+              const I = vendor.category.includes("Florist") ? Flower2
+                : vendor.category === "Photography" ? Camera
+                : vendor.category === "Bakery" ? Cake
+                : vendor.category === "Entertainment" ? Music
+                : vendor.category === "Restaurant" || vendor.category === "Caterer" ? Utensils
+                : Building2;
+              const palette = PAL[index % PAL.length];
+              return (
+                <motion.article
+                  key={vendor.id}
+                  initial={{opacity:0,y:8}}
+                  animate={{opacity:1,y:0}}
+                  transition={{delay:Math.min(index,8)*0.03}}
+                  className="rounded-2xl border border-[#E7E4DB] bg-white p-4 shadow-[0_2px_8px_rgba(27,48,38,0.035)] transition-all hover:-translate-y-0.5 hover:border-[#B9C9BD] hover:shadow-[0_10px_24px_rgba(27,48,38,0.08)]"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{background:palette.bg}}>
+                      <I size={17} style={{color:palette.fg}}/>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="inline-flex rounded-full bg-[#EDF2ED] px-2 py-1 text-[10px] font-bold text-[#315C4C]">{vendor.category}</span>
+                      <h4 className="mt-2 font-display text-sm font-extrabold leading-snug text-[#202B27]">{vendor.name}</h4>
+                      {vendor.address && <p className="mt-1 text-xs leading-relaxed text-[#788179]">{vendor.address}</p>}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-[#F0EEE8] pt-3">
+                    {vendor.phone && (
+                      <a href={`tel:${vendor.phone}`} className="inline-flex items-center gap-1.5 rounded-lg bg-[#F6F7F2] px-2.5 py-1.5 text-[11px] font-bold text-[#315C4C] hover:bg-[#E9EFE8]">
+                        <Phone size={12}/> Call
+                      </a>
+                    )}
+                    {vendor.website && (
+                      <a href={vendor.website.startsWith("http") ? vendor.website : `https://${vendor.website}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-[#F6F7F2] px-2.5 py-1.5 text-[11px] font-bold text-[#315C4C] hover:bg-[#E9EFE8]">
+                        <Globe2 size={12}/> Website
+                      </a>
+                    )}
+                    <a href={vendor.mapUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-[#F6F7F2] px-2.5 py-1.5 text-[11px] font-bold text-[#315C4C] hover:bg-[#E9EFE8]">
+                      <ExternalLink size={12}/> Open map
+                    </a>
+                  </div>
+                </motion.article>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {!loading && !error && searchedCity && vendors.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-[#D8D6CD] bg-white px-5 py-10 text-center">
+          <Store size={24} className="mx-auto text-[#A77D2B]"/>
+          <h3 className="mt-3 font-display font-extrabold text-[#202B27]">No mapped listings found nearby</h3>
+          <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-[#778078]">Try a nearby city or broaden your search. OpenStreetMap may not have complete business coverage in this area.</p>
+          <a
+            href={`https://www.google.com/maps/search/event+vendors+${encodeURIComponent(searchedCity)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#D8D6CD] px-4 py-2.5 text-xs font-bold text-[#315C4C] hover:bg-[#F6F7F2]"
+          >
+            Search more places on Google Maps <ExternalLink size={13}/>
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -472,97 +627,159 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
   const [showCelebration, setShowCelebration] = useState(false);
   const ep = EVENT_PAL[plan.eventType?.toLowerCase()] ?? PAL[0];
   const { say } = useDiya();
+  const highlights = (plan as EventPlan & {highlights?:string[]}).highlights ?? [];
 
   useEffect(()=>{
     setShowCelebration(true);
     say("Your event plan is ready — this is going to be spectacular!", "celebrate", 4000);
-    setTimeout(()=>setShowCelebration(false), 5000);
+    const timer = window.setTimeout(()=>setShowCelebration(false), 1800);
+    return () => window.clearTimeout(timer);
   },[say]);
 
-  const highlights = (plan as EventPlan & {highlights?:string[]}).highlights;
+  const tabCopy: Record<TabId, {title:string;description:string}> = {
+    timeline: { title:"The day, at a glance", description:"A considered schedule from first setup to final send-off." },
+    budget: { title:"Your budget, thoughtfully planned", description:"See where the budget goes and adjust your priorities." },
+    vendors: { title:`Find local vendors in ${plan.city}`, description:"Explore real place listings near your event city." },
+    checklist: { title:"Your planning checklist", description:"A clear set of next steps to keep everything moving." },
+  };
+  const metrics = [
+    { Icon:Calendar, label:"Event date", value:new Date(`${plan.eventDate}T00:00:00`).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) },
+    { Icon:Users, label:"Guest list", value:`${plan.guestCount.toLocaleString("en-IN")} guests` },
+    { Icon:MapPin, label:"Celebrating in", value:plan.city },
+    { Icon:Rupee, label:"Planned budget", value:formatINR(plan.budgetTotal) },
+  ];
 
   return (
-    <motion.div initial={{opacity:0}} animate={{opacity:1}} className="min-h-screen bg-[#F4F6F8] flex flex-col">
+    <motion.div initial={{opacity:0}} animate={{opacity:1}} className="min-h-screen bg-[#F6F7F2] text-[#202B27]">
       <PlanLockedCelebration active={showCelebration}/>
-
-      {/* Hero */}
-      <div className="relative overflow-hidden" style={{background:`linear-gradient(135deg, ${ep.fg}15 0%, ${ep.fg}05 100%)`}}>
-        <div className="max-w-3xl mx-auto px-5 py-8 flex items-center gap-5">
-          <div className="flex-shrink-0">
-            <Diya moodOverride="celebrate" size={110}/>
+      <header className="sticky top-0 z-30 border-b border-[#E8E6DE] bg-[#FBFCF9]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#214E43] text-[#F6C65B]">
+              <Sparkles size={16}/>
+            </span>
+            <div>
+              <p className="font-display text-sm font-extrabold text-[#214E43]">EventMate<span className="text-[#D9684E]">.</span></p>
+              <p className="text-[10px] font-medium text-[#7D877F]">Your event workspace</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <motion.p initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}}
-              className="text-xs font-bold uppercase tracking-widest mb-1" style={{color:ep.fg}}>
-              Your Professional Event Plan ✦
-            </motion.p>
-            <motion.h1 initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:0.08}}
-              className="text-3xl font-extrabold text-[#111827] capitalize font-display leading-tight">
-              {plan.eventType} Plan
-            </motion.h1>
-            <motion.p initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.14}}
-              className="text-sm text-[#6B7280] mt-1">{plan.theme}</motion.p>
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.2}}
-              className="flex flex-wrap gap-2 mt-3">
-              {[
-                {I:Calendar, v:new Date(plan.eventDate+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})},
-                {I:Users, v:`${plan.guestCount} guests`},
-                {I:MapPin, v:plan.city},
-                {I:Rupee, v:formatINR(plan.budgetTotal)},
-              ].map(({I,v},i)=>(
-                <span key={i} className="flex items-center gap-1.5 text-xs font-semibold text-[#374151] bg-white border border-[#E5E7EB] px-3 py-1.5 rounded-full shadow-sm">
-                  <I size={11} style={{color:ep.fg}}/>{v}
-                </span>
-              ))}
-            </motion.div>
+          <div className="flex items-center gap-2">
+            <span className="hidden items-center gap-1.5 rounded-full border border-[#D8E5D8] bg-[#EDF4EC] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wide text-[#315C4C] sm:inline-flex">
+              <CheckCircle2 size={12}/> Plan ready
+            </span>
+            <button onClick={onBack} className="inline-flex items-center gap-1.5 rounded-xl border border-[#D8D6CD] bg-white px-3 py-2 text-xs font-bold text-[#52645A] transition hover:border-[#A77D2B]/60 hover:bg-[#FBF8EE]">
+              <RotateCcw size={12}/><span className="hidden sm:inline">Start over</span>
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Highlights */}
-        {highlights && highlights.length > 0 && (
-          <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:0.3}}
-            className="max-w-3xl mx-auto px-5 pb-5 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {highlights.map((h,i)=>(
-              <div key={i} className="bg-white/80 rounded-xl px-3 py-2.5 flex items-center gap-2 border border-white/60">
-                <Sparkles size={11} style={{color:ep.fg}} className="flex-shrink-0"/>
-                <p className="text-xs font-semibold text-[#374151] leading-snug">{h}</p>
+      <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-5 sm:px-6 sm:pt-8">
+        <section className="relative overflow-hidden rounded-[28px] bg-[#173F35] shadow-[0_16px_44px_rgba(27,56,43,0.16)]">
+          <div className="pointer-events-none absolute -right-20 -top-32 h-80 w-80 rounded-full bg-[#F6C65B]/10 blur-3xl"/>
+          <div className="pointer-events-none absolute -bottom-36 left-1/3 h-72 w-72 rounded-full bg-[#76A88A]/15 blur-3xl"/>
+          <div className="relative grid items-center gap-4 px-5 py-7 sm:px-8 sm:py-9 md:grid-cols-[1fr_auto] md:px-10">
+            <div className="min-w-0">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#F4D991]">
+                <Sparkles size={12}/> Made for your day
               </div>
-            ))}
-          </motion.div>
-        )}
-      </div>
+              <h1 className="font-display text-3xl font-extrabold capitalize leading-tight tracking-tight text-white sm:text-4xl md:text-5xl">
+                {plan.eventType}
+              </h1>
+              <p className="mt-1.5 text-sm text-[#DCE8DF] sm:text-base">{plan.theme || "A celebration made yours"}</p>
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                {metrics.map(({Icon,label,value})=>(
+                  <div key={label} className="min-w-0 rounded-xl border border-white/10 bg-white/[0.08] px-3 py-2.5 sm:min-w-[130px]">
+                    <p className="flex items-center gap-1.5 text-[10px] font-semibold text-[#C8D9CC]"><Icon size={11} className="text-[#F4D991]"/>{label}</p>
+                    <p className="mt-1 truncate text-sm font-extrabold text-white">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="hidden items-center justify-center md:flex">
+              <Diya moodOverride="celebrate" size={120}/>
+            </div>
+          </div>
+        </section>
 
-      {/* Tabs */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-5 pb-10">
-          <div className="flex border-b border-[#E5E7EB] mb-5 bg-white sticky top-0 z-10">
-            {PLAN_TABS.map(({id,label,Icon:I})=>{
+        {highlights.length > 0 && (
+          <section aria-label="Plan highlights" className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {highlights.slice(0,4).map((highlight,index)=>(
+              <motion.div key={`${highlight}-${index}`} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:index*0.06}}
+                className="flex min-h-[68px] items-center gap-3 rounded-2xl border border-[#E7E6DE] bg-white px-3.5 py-3 shadow-[0_2px_8px_rgba(27,48,38,0.025)]">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F8F1D9] text-[#A77D2B]"><Sparkles size={14}/></span>
+                <p className="text-xs font-bold leading-relaxed text-[#34483F]">{highlight}</p>
+              </motion.div>
+            ))}
+          </section>
+        )}
+
+        <nav aria-label="Plan sections" className="sticky top-[61px] z-20 mt-6 rounded-2xl border border-[#E6E4DC] bg-white/95 p-1.5 shadow-[0_8px_24px_rgba(27,48,38,0.06)] backdrop-blur">
+          <div role="tablist" className="grid grid-cols-4 gap-1">
+            {PLAN_TABS.map(({id,label,Icon})=>{
               const active=tab===id;
               return (
-                <button key={id} onClick={()=>setTab(id)}
-                  className={`relative flex-1 flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold transition-colors ${active?"text-[#6366F1] bg-white":"text-[#9CA3AF] hover:text-[#374151]"}`}>
-                  <I size={12}/><span className="hidden sm:inline">{label}</span>
-                  {active&&<motion.div layoutId="plan-tab" className="absolute bottom-0 left-4 right-4 h-0.5 bg-[#6366F1] rounded-full"/>}
+                <button key={id} id={`plan-tab-${id}`} role="tab" aria-selected={active} aria-controls="plan-panel" onClick={()=>setTab(id)}
+                  className={`relative flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 text-[11px] font-extrabold transition-colors sm:gap-2 sm:text-xs ${
+                    active?"bg-[#214E43] text-white shadow-sm":"text-[#758078] hover:bg-[#F3F5F0] hover:text-[#315C4C]"
+                  }`}>
+                  <Icon size={14}/><span>{label}</span>
                 </button>
               );
             })}
           </div>
-          <AnimatePresence mode="wait">
-            {tab==="timeline"  &&<motion.div key="tl" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><TimelineSection items={plan.timeline}/></motion.div>}
-            {tab==="budget"    &&<motion.div key="bg" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><BudgetSection items={plan.budgetBreakdown} total={plan.budgetTotal}/></motion.div>}
-            {tab==="vendors"   &&<motion.div key="vd" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><VendorsSection vendors={plan.vendors}/></motion.div>}
-            {tab==="checklist" &&<motion.div key="cl" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><ChecklistSection items={plan.checklist}/></motion.div>}
-          </AnimatePresence>
-          <button onClick={onStartRun}
-            className="w-full mt-5 py-3 rounded-2xl bg-[#173F35] text-white text-sm font-bold hover:bg-[#245747] transition-all flex items-center justify-center gap-2">
-            <PartyPopper size={14}/> Start event day · Open Command Center
-          </button>
-          <button onClick={onBack}
-            className="w-full mt-8 py-3 rounded-2xl border-2 border-[#E5E7EB] text-[#9CA3AF] text-sm font-bold hover:border-[#6366F1]/40 hover:text-[#6366F1] transition-all flex items-center justify-center gap-2">
-            <RotateCcw size={13}/> Plan another event
-          </button>
+        </nav>
+
+        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_290px]">
+          <section id="plan-panel" role="tabpanel" aria-labelledby={`plan-tab-${tab}`} className="min-w-0 rounded-[24px] border border-[#E7E6DE] bg-white p-4 shadow-[0_6px_24px_rgba(27,48,38,0.04)] sm:p-6">
+            <div className="mb-5">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.17em]" style={{color:ep.fg}}>Your plan</p>
+              <h2 className="mt-1 font-display text-xl font-extrabold tracking-tight text-[#202B27] sm:text-2xl">{tabCopy[tab].title}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-[#788179]">{tabCopy[tab].description}</p>
+            </div>
+            <AnimatePresence mode="wait">
+              {tab==="timeline"  &&<motion.div key="tl" initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0}}><TimelineSection items={plan.timeline}/></motion.div>}
+              {tab==="budget"    &&<motion.div key="bg" initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0}}><BudgetSection items={plan.budgetBreakdown} total={plan.budgetTotal}/></motion.div>}
+              {tab==="vendors"   &&<motion.div key="vd" initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0}}><VendorsSection city={plan.city}/></motion.div>}
+              {tab==="checklist" &&<motion.div key="cl" initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0}}><ChecklistSection items={plan.checklist}/></motion.div>}
+            </AnimatePresence>
+          </section>
+
+          <aside className="space-y-3">
+            <div className="rounded-[22px] border border-[#E7E6DE] bg-white p-5 shadow-[0_6px_24px_rgba(27,48,38,0.04)]">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#8A918A]">At a glance</p>
+              <div className="mt-4 space-y-3">
+                {[
+                  {Icon:Clock,label:"Schedule",value:`${plan.timeline.length} moments`},
+                  {Icon:IndianRupee,label:"Budget plan",value:`${plan.budgetBreakdown.length} categories`},
+                  {Icon:Building2,label:"Vendor search",value:`${plan.city} listings`},
+                  {Icon:CheckCircle2,label:"To prepare",value:`${plan.checklist.length} checklist items`},
+                ].map(({Icon,label,value})=>(
+                  <div key={label} className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#F1F4EF] text-[#315C4C]"><Icon size={14}/></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold text-[#8A918A]">{label}</p>
+                      <p className="truncate text-xs font-extrabold text-[#34483F]">{value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[22px] border border-[#E8DFC5] bg-[#FBF8EE] p-5">
+              <div className="flex items-center gap-2 text-[#8B6B2B]"><Heart size={15}/><p className="text-xs font-extrabold">A little planning tip</p></div>
+              <p className="mt-2 text-xs leading-relaxed text-[#6E6652]">Use your checklist to confirm bookings and keep vendor availability aligned with your event date.</p>
+            </div>
+            <button onClick={onStartRun}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#214E43] px-4 py-3 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(33,78,67,0.18)] transition hover:-translate-y-0.5 hover:bg-[#173D34]">
+              <PartyPopper size={15}/> Open Command Center
+            </button>
+            <button onClick={onBack}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D8D6CD] bg-white px-4 py-2.5 text-xs font-bold text-[#657168] transition hover:border-[#A77D2B]/50 hover:bg-[#FBF8EE]">
+              <RotateCcw size={13}/> Plan another event
+            </button>
+          </aside>
         </div>
-      </div>
+      </main>
     </motion.div>
   );
 }
