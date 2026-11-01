@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenRouterClient } from "@/lib/llm";
+import { normalizeBudgetAmounts, parseBudget } from "@/lib/budget";
 import { buildNextEventQuestion, type EventChatMessage } from "@/lib/eventQuestions";
 
 export const dynamic = "force-dynamic";
@@ -42,10 +43,11 @@ export interface ChecklistItem {
 
 // ─── Plan generation prompt ───────────────────────────────────────────────────
 function buildPlanPrompt(d: Record<string, string | null>): string {
+  const budgetTotal = parseBudget(d.budgetTotal ?? "");
   return `You are a professional event planner. Generate a complete, detailed event plan as JSON only (no markdown).
 
 Event: ${d.eventType}, Date: ${d.eventDate}, Guests: ${d.guestCount}
-City: ${d.city}, Budget: ${d.budgetTotal}, Theme: ${d.theme ?? "Classic & Elegant"}
+City: ${d.city}, Budget: ${d.budgetTotal} (planning amount: ₹${budgetTotal}), Theme: ${d.theme ?? "Classic & Elegant"}
 Venue: ${d.venueStyle ?? "TBD"}, Catering: ${d.cateringType ?? "TBD"}
 Special: ${d.specialRequirements ?? "None"}
 Occasion-specific details: ${JSON.stringify(d.eventDetails ?? {})}
@@ -56,7 +58,7 @@ Return ONLY this JSON structure:
   "eventDate": "${d.eventDate}",
   "guestCount": 100,
   "city": "${d.city}",
-  "budgetTotal": 500000,
+  "budgetTotal": ${budgetTotal},
   "theme": "${d.theme ?? "Classic & Elegant"}",
   "venueStyle": "${d.venueStyle ?? "Indoor"}",
   "cateringType": "${d.cateringType ?? "Both"}",
@@ -71,7 +73,7 @@ Return ONLY this JSON structure:
 
 Requirements:
 - guestCount: parse "${d.guestCount}" to realistic integer (e.g. "50-100"→75, "Under 50"→30, "500+"→600)
-- budgetTotal: parse "${d.budgetTotal}" to INR integer (e.g. "₹3-7L"→500000, "₹7-15L"→1100000, "Under ₹1L"→80000)
+- budgetTotal: use the exact planning amount ₹${budgetTotal}; do not recalculate it
 - highlights: 4 exciting features specific to this event
 - timeline: exactly 12 items covering full day from setup to wrap-up
 - budgetBreakdown: exactly 8 categories, percentages sum to 100, amounts sum to budgetTotal
@@ -107,7 +109,10 @@ export async function POST(request: Request) {
       });
       const raw = (res.choices[0]?.message?.content ?? "{}")
         .replace(/^```json?\s*/i, "").replace(/\s*```$/, "").trim();
-      return NextResponse.json({ plan: JSON.parse(raw) });
+      const plan = JSON.parse(raw) as EventPlan;
+      plan.budgetTotal = parseBudget(body.planData.budgetTotal ?? "");
+      plan.budgetBreakdown = normalizeBudgetAmounts(plan.budgetBreakdown, plan.budgetTotal);
+      return NextResponse.json({ plan });
     }
 
     return NextResponse.json(buildNextEventQuestion(messages));

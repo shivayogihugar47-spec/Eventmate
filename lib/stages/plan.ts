@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { llmJson } from "@/lib/llm";
+import { parseBudget } from "@/lib/budget";
 import { type Answers } from "./ask";
 import type { EventPlan, TimelineItem, BudgetItem } from "@/app/api/chat/route";
+
+export { parseBudget } from "@/lib/budget";
 
 const PlanSchema = z.object({
   highlights: z.array(z.string()),
@@ -123,16 +126,6 @@ export async function generatePlan(eventId: string): Promise<EventPlan> {
   await sql`UPDATE events SET stage = 'run' WHERE id = ${eventId}`;
 
   return fullPlan;
-}
-
-export function parseBudget(b: string): number {
-  const clean = b.replace(/[^0-9L-]/g, ""); // Keep hyphen
-  if (clean.includes("L")) {
-    const parts = clean.split("-").map(p => parseFloat(p.replace("L", "")));
-    const avg = parts.length > 1 ? (parts[0] + parts[1]) / 2 : parts[0];
-    return avg * 100000;
-  }
-  return parseInt(clean) || 0;
 }
 
 export function normalizeBudget(raw: RawPlan["budgetBreakdown"], total: number, priorities: string[]): BudgetItem[] {

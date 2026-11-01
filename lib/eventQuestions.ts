@@ -1,4 +1,5 @@
 import type { AssistantCard, QuickOption } from "@/app/api/chat/route";
+import { BUDGET_OPTIONS } from "@/lib/budget";
 
 export interface EventChatMessage {
   role: string;
@@ -77,7 +78,7 @@ const sharedQuestions: Omit<EventQuestion, "step">[] = [
     label: "Budget",
     title: "What's your total budget range?",
     subtitle: "This helps make every part of the plan realistic.",
-    options: ["Under ₹1L", "₹1–3L", "₹3–7L", "₹7–15L", "₹15L+"].map((label) => ({ label, value: label })),
+    options: BUDGET_OPTIONS,
   },
 ];
 

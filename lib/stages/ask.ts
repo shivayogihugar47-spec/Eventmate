@@ -2,6 +2,7 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { llmJson } from "@/lib/llm";
 import type { AssistantCard } from "@/app/api/chat/route";
+import { BUDGET_OPTIONS } from "@/lib/budget";
 
 export const PRIORITIES = ["Food", "Decor", "Photography", "Venue", "Entertainment"];
 
@@ -138,13 +139,7 @@ function getNextQuestion(answers: Answers): AssistantCard {
       step: 5,
       title: "What's your total budget range?",
       subtitle: `I'll make sure every rupee is well-spent in ${answers.city}.`,
-      options: [
-        { label: "Under ₹1L", value: "Under ₹1L" },
-        { label: "₹1–3L", value: "₹1–3L" },
-        { label: "₹3–7L", value: "₹3–7L" },
-        { label: "₹7–15L", value: "₹7–15L" },
-        { label: "₹15L+", value: "₹15L+" },
-      ],
+      options: BUDGET_OPTIONS,
     };
   }
   if (!answers.priorities || answers.priorities.length < PRIORITIES.length) {

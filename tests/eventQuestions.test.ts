@@ -20,6 +20,18 @@ describe("event question progression", () => {
     expect(result.collectedData.eventType).toBe("corporate");
   });
 
+  it("offers budget ranges from small events through crore-scale events", () => {
+    const result = buildNextEventQuestion(
+      ["Birthday", "2027-05-01", "Under 50", "Pune"].map((content) => ({ role: "user", content })),
+    );
+
+    expect(result.card?.step).toBe(5);
+    expect(result.card?.options?.map((option) => option.label)).toEqual([
+      "Under ₹25,000", "₹25,000–₹50,000", "₹50,000–₹1L", "₹1–3L", "₹3–7L",
+      "₹7–15L", "₹15–30L", "₹30–50L", "₹50L–₹1Cr", "₹1Cr+",
+    ]);
+  });
+
   it("uses a corporate track with relevant format, objective, and production questions", () => {
     const flow = getEventQuestionFlow("corporate");
 

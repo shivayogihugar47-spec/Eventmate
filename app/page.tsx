@@ -13,6 +13,7 @@ import {
 import type { EventPlan, AssistantCard, TimelineItem, BudgetItem, VendorItem, ChecklistItem } from "./api/chat/route";
 import { useDiya } from "@/lib/diyaStore";
 import { buildNextEventQuestion, getEventQuestionFlow, type EventCollectedData } from "@/lib/eventQuestions";
+import { formatINR } from "@/lib/budget";
 
 // ── Dynamic imports (SSR safe) ────────────────────────────────────────────────
 const Diya    = dynamic(() => import("@/components/diya/Diya").then(m => m.Diya), { ssr: false });
@@ -36,7 +37,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   checkcircle2:CheckCircle2,
 };
 const getIcon = (n: string): LucideIcon => ICON_MAP[n?.toLowerCase().replace(/[-_\s]/g, "")] ?? Sparkles;
-const fmtINR  = (n: number) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n.toLocaleString("en-IN")}`;
 
 const EVENT_PAL: Record<string, typeof PAL[0]> = {
   wedding: PAL[0], birthday: PAL[1], community: PAL[2],
@@ -114,6 +114,8 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
     return {day,value,date,disabled:value<todayKey};
   });
   const monthLabel = visibleMonth.toLocaleDateString("en-US",{month:"long",year:"numeric"});
+  const customBudgetAmount = Number(textVal);
+  const canSubmitCustomBudget = Number.isSafeInteger(customBudgetAmount) && customBudgetAmount > 0;
 
   return (
     <motion.div
@@ -133,29 +135,51 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
 
       {/* Option grid */}
       {card.options && card.options.length > 0 && (
-        <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.2}}
-          className="grid grid-cols-2 gap-2.5 mb-4">
-          {card.options.map((opt,i)=>(
-            <motion.button key={opt.value}
-              onClick={()=>submit(opt.value,opt.label)}
-              initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
-              transition={{delay:0.2+i*0.05}}
-              whileHover={{y:-3,boxShadow:"0 8px 24px rgba(99,102,241,0.15)"}}
-              whileTap={{scale:0.97}}
-              className={`relative flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all font-semibold text-sm ${
-                selected===opt.value ? "border-[#6366F1] bg-[#EEF2FF] text-[#4338CA]"
-                : "border-[#E5E7EB] bg-white text-[#374151] hover:border-[#6366F1]/50"
-              }`}>
-              {selected===opt.value && (
-                <motion.div layoutId="sel-check"
-                  className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#6366F1] flex items-center justify-center">
-                  <Check size={11} strokeWidth={3} className="text-white"/>
-                </motion.div>
-              )}
-              {opt.label}
-            </motion.button>
-          ))}
-        </motion.div>
+        <div className="space-y-4">
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.2}}
+            className="grid grid-cols-2 gap-2.5">
+            {card.options.map((opt,i)=>(
+              <motion.button key={opt.value}
+                onClick={()=>submit(opt.value,opt.label)}
+                initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
+                transition={{delay:0.2+i*0.05}}
+                whileHover={{y:-3,boxShadow:"0 8px 24px rgba(99,102,241,0.15)"}}
+                whileTap={{scale:0.97}}
+                className={`relative flex items-center gap-3 rounded-2xl border-2 p-4 text-left text-sm font-semibold transition-all ${
+                  selected===opt.value ? "border-[#6366F1] bg-[#EEF2FF] text-[#4338CA]"
+                  : "border-[#E5E7EB] bg-white text-[#374151] hover:border-[#6366F1]/50"
+                }`}>
+                {selected===opt.value && (
+                  <motion.div layoutId="sel-check"
+                    className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#6366F1]">
+                    <Check size={11} strokeWidth={3} className="text-white"/>
+                  </motion.div>
+                )}
+                {opt.label}
+              </motion.button>
+            ))}
+          </motion.div>
+          {card.step === 5 && (
+            <div className="rounded-2xl border border-[#E6E0D3] bg-[#FFFEFA] p-4">
+              <label htmlFor="custom-budget" className="mb-2 block text-xs font-bold text-[#344B3B]">Or enter an exact budget in rupees</label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-[#A77D2B]">₹</span>
+                <input id="custom-budget" ref={inputRef} type="number" min="1" step="1" inputMode="numeric"
+                  value={textVal} onChange={event=>setTextVal(event.target.value)}
+                  onKeyDown={event=>{if(event.key==="Enter"&&canSubmitCustomBudget)submit(`₹${customBudgetAmount.toLocaleString("en-IN")}`,`₹${customBudgetAmount.toLocaleString("en-IN")}`);}}
+                  placeholder="e.g. 75000"
+                  className="min-w-0 flex-1 border-b border-[#DCD6C8] bg-transparent py-2 text-sm font-semibold text-[#263B32] outline-none placeholder:font-normal placeholder:text-[#A5ADA6] focus:border-[#A77D2B]"/>
+                <button type="button"
+                  onClick={()=>canSubmitCustomBudget&&submit(`₹${customBudgetAmount.toLocaleString("en-IN")}`,`₹${customBudgetAmount.toLocaleString("en-IN")}`)}
+                  disabled={!canSubmitCustomBudget}
+                  className="rounded-xl bg-[#173F35] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#245747] disabled:cursor-not-allowed disabled:opacity-40">
+                  Use amount
+                </button>
+              </div>
+              <p className="mt-2 text-[10px] text-[#68796F]">Ranges use their midpoint; ₹1Cr+ starts at ₹1 crore.</p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Free text */}
@@ -346,7 +370,7 @@ function BudgetSection({ items, total }:{ items:BudgetItem[]; total:number }) {
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-sm font-semibold text-[#111827] truncate">{it.category}</span>
                 <span className="text-xs font-bold ml-2 flex-shrink-0" style={{color:p.fg}}>
-                  {fmtINR(it.allocated)} <span className="text-[#C4C4C4] font-normal">({pct}%)</span>
+                  {formatINR(it.allocated)} <span className="text-[#C4C4C4] font-normal">({pct}%)</span>
                 </span>
               </div>
               <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
@@ -482,7 +506,7 @@ function PlanReveal({ plan, onBack }:{ plan:EventPlan; onBack:()=>void }) {
                 {I:Calendar, v:new Date(plan.eventDate+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})},
                 {I:Users, v:`${plan.guestCount} guests`},
                 {I:MapPin, v:plan.city},
-                {I:Rupee, v:fmtINR(plan.budgetTotal)},
+                {I:Rupee, v:formatINR(plan.budgetTotal)},
               ].map(({I,v},i)=>(
                 <span key={i} className="flex items-center gap-1.5 text-xs font-semibold text-[#374151] bg-white border border-[#E5E7EB] px-3 py-1.5 rounded-full shadow-sm">
                   <I size={11} style={{color:ep.fg}}/>{v}
@@ -1011,26 +1035,26 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
       <FloatingOrbs color={activeColor}/>
 
       {/* Header */}
-      <header className="relative z-20 bg-white/90 backdrop-blur-sm border-b border-[#E5E7EB] px-5 py-3 flex items-center justify-between gap-3">
+      <header className="relative z-20 flex items-center justify-between gap-3 border-b border-[#E6E0D3] bg-[#FFFEFA]/95 px-5 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2.5 flex-shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-[#6366F1] flex items-center justify-center">
-            <Sparkles size={15} className="text-white"/>
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#173F35] shadow-[0_2px_6px_rgba(23,63,53,0.18)]">
+            <Sparkles size={15} className="text-[#F0D38C]"/>
           </div>
-          <span className="font-extrabold text-[#111827] font-display">EventMate.</span>
+          <span className="font-display font-extrabold text-[#173F35]">EventMate<span className="text-[#A77D2B]">.</span></span>
         </div>
 
         {/* Progress bar */}
         <div className="flex items-center gap-2 flex-1 max-w-xs mx-4">
-          <div className="flex-1 h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
-            <motion.div className="h-full rounded-full" style={{background:activeColor}}
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#E8E4DA]">
+            <motion.div className="h-full rounded-full bg-[#B88B3A]"
                 animate={{width:`${Math.min((progress/totalQuestions)*100,100)}%`}}
               transition={{type:"spring",stiffness:200,damping:30}}/>
           </div>
-              <span className="text-[11px] font-bold text-[#9CA3AF]">{progress}/{totalQuestions}</span>
+              <span className="min-w-[2.5rem] text-[11px] font-bold tabular-nums text-[#52645A]">{progress}/{totalQuestions}</span>
         </div>
 
         <button onClick={onBack}
-          className="flex-shrink-0 flex items-center gap-1 text-[11px] font-bold text-[#9CA3AF] hover:text-[#6366F1] border border-[#E5E7EB] rounded-xl px-3 py-2 hover:border-[#6366F1]/30 transition-all">
+          className="flex flex-shrink-0 items-center gap-1 rounded-xl border border-[#DCD6C8] bg-white/70 px-3 py-2 text-[11px] font-bold text-[#52645A] transition-all hover:border-[#A77D2B]/50 hover:bg-[#F7F2E5] hover:text-[#173F35] focus-visible:outline-[#A77D2B]">
           <RotateCcw size={11}/><span className="hidden sm:inline ml-0.5">New</span>
         </button>
       </header>
@@ -1040,30 +1064,30 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
 
         {/* LEFT — event score */}
         <aside className="relative z-10 flex flex-col overflow-hidden bg-[#F5F2E9] text-[#263B32] lg:min-h-[calc(100vh-57px)] lg:w-[22rem] lg:flex-shrink-0 lg:border-r lg:border-[#DDD9CC]">
-          <div className="relative bg-[#1D4238] px-5 pb-4 pt-4 text-white sm:px-7 lg:px-7 lg:pb-5 lg:pt-6">
-            <div className="absolute bottom-0 left-0 top-0 w-1 bg-[#D7B45A]" aria-hidden="true"/>
+          <div className="relative bg-[#173F35] px-5 pb-4 pt-4 text-white sm:px-7 lg:px-7 lg:pb-5 lg:pt-6">
+            <div className="absolute bottom-0 left-0 top-0 w-1 bg-[#E7BD68]" aria-hidden="true"/>
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-[9px] font-extrabold uppercase tracking-[0.22em] text-[#E9C777]">The event score</p>
-                <h2 className="mt-1 font-display text-lg font-extrabold leading-tight sm:text-xl">From idea to occasion</h2>
+                <p className="text-[9px] font-extrabold uppercase tracking-[0.22em] text-[#F0D38C]">The event score</p>
+                <h2 className="mt-1 font-display text-lg font-extrabold leading-tight text-[#FFFDF7] sm:text-xl">From idea to occasion</h2>
               </div>
               <div className="text-right">
                 <p className="font-display text-2xl font-extrabold leading-none text-[#F4D991]">{String(answers.length).padStart(2,"0")}<span className="text-sm text-white/45"> / {String(totalQuestions).padStart(2,"0")}</span></p>
-                <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.16em] text-white/55">details gathered</p>
+                <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#D8E5DC]">details gathered</p>
               </div>
             </div>
             <div className="mt-4 h-[2px] bg-white/15">
-              <motion.div className="h-full bg-[#E9C777]" animate={{width:`${answers.length/totalQuestions*100}%`}} transition={{duration:0.45}}/>
+              <motion.div className="h-full bg-[#E7BD68]" animate={{width:`${answers.length/totalQuestions*100}%`}} transition={{duration:0.45}}/>
             </div>
           </div>
 
           <div className="relative flex-1 px-5 py-4 sm:px-7 lg:px-7 lg:py-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#89938C]">The planning arc</p>
-                <p className="mt-1 text-xs text-[#68756B]">One thoughtful detail at a time</p>
+                <p className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#68796F]">The planning arc</p>
+                <p className="mt-1 text-xs text-[#52645A]">One thoughtful detail at a time</p>
               </div>
-              <Sparkles size={16} className="text-[#B58B38]"/>
+              <Sparkles size={16} className="text-[#A77D2B]"/>
             </div>
 
             <div className="relative">
