@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { analyzeImpact } from "@/lib/run/impact";
+import { analyzeImpact, applyChanges } from "@/lib/run/impact";
 import { parseChangeText, parseQuickChange } from "@/lib/run/intake";
 import { generateOptions } from "@/lib/run/options";
 import { verifyOptions, deterministicShiftOption } from "@/lib/run/verify";
 import { consumeRateLimit, loadOwnedOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
 import type { PlanRisk, RunChange, RunOption } from "@/lib/run/types";
-import { RunApiError } from "@/lib/run/apply";
+import { commitPlanVersion, RunApiError } from "@/lib/run/apply";
 
 const RequestSchema = z.object({
   version: z.number().int().positive(),
   text: z.string().max(1200).optional(),
-  action: z.enum(["delay-15", "delay-30", "vendor-cancelled", "more-guests", "rain", "venue-issue"]).optional(),
+  action: z.enum(["delay-15", "delay-30", "task-done", "vendor-cancelled", "more-guests", "rain", "venue-issue"]).optional(),
   taskId: z.string().uuid().optional(),
+  idempotencyKey: z.string().min(8).max(128).regex(/^[A-Za-z0-9._:-]+$/).optional(),
 }).refine((value) => Boolean(value.text?.trim()) !== Boolean(value.action), {
   message: "Provide either a change description or a quick action.",
 });
@@ -45,6 +46,12 @@ export async function POST(request: Request, context: RouteContext) {
     }
     const run = await loadOwnedOrganizerRun(request, eventId);
     if (run.version !== body.version) {
+      const taskAlreadyDone = body.action === "task-done"
+        && body.taskId
+        && run.plan.timeline.some((task) => task.id === body.taskId && task.status === "done");
+      if (taskAlreadyDone) {
+        return NextResponse.json({ completedTask: true, version: run.version, plan: run.plan });
+      }
       return NextResponse.json({ error: "The plan changed. Refresh to see the latest version.", stale: true }, { status: 409 });
     }
 
@@ -53,9 +60,12 @@ export async function POST(request: Request, context: RouteContext) {
     if (body.action) {
       const change = parseQuickChange(body.action, run.plan);
       if (!change) return NextResponse.json({ error: "That quick action is not available." }, { status: 400 });
-      if (body.taskId && ["delay-15", "delay-30", "vendor-cancelled"].includes(body.action)) change.taskId = body.taskId;
+      if (body.taskId && ["delay-15", "delay-30", "task-done", "vendor-cancelled"].includes(body.action)) change.taskId = body.taskId;
       if (body.action === "vendor-cancelled" && !change.taskId) {
         return NextResponse.json({ error: "Choose the task whose vendor cancelled." }, { status: 400 });
+      }
+      if (body.action === "task-done" && !change.taskId) {
+        return NextResponse.json({ error: "Choose the task you completed." }, { status: 400 });
       }
       changes = [change];
     } else {
@@ -68,6 +78,25 @@ export async function POST(request: Request, context: RouteContext) {
       await sql`INSERT INTO plan_events (event_id, type, payload, actor)
         VALUES (${run.eventId}, 'CLARIFICATION', ${JSON.stringify({ question: clarifyingQuestion, input: body.text })}, 'organizer')`;
       return NextResponse.json({ clarifyingQuestion });
+    }
+
+    if (changes.length === 1 && changes[0].type === "TASK_DONE" && changes[0].taskId) {
+      const task = run.plan.timeline.find((entry) => entry.id === changes[0].taskId);
+      if (!task) return NextResponse.json({ error: "That task is not in this plan." }, { status: 400 });
+      if (task.status === "done") {
+        return NextResponse.json({ completedTask: true, version: run.version, plan: run.plan });
+      }
+      const change = { ...changes[0], actualAt: new Date().toISOString() };
+      const result = await commitPlanVersion({
+        eventId: run.eventId,
+        expectedVersion: run.version,
+        idempotencyKey: body.idempotencyKey ?? crypto.randomUUID(),
+        plan: applyChanges(run.plan, [change]),
+        changes: [change],
+        note: `Task completed: ${task.task}`,
+        actor: "organizer",
+      });
+      return NextResponse.json({ completedTask: true, version: result.version, plan: result.plan });
     }
 
     await Promise.all(changes.map((change) => sql`INSERT INTO plan_events (event_id, type, payload, actor)

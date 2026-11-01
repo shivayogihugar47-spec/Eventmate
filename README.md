@@ -69,7 +69,7 @@ CHANGE -> INTAKE -> IMPACT ENGINE -> OPTION GENERATOR -> VERIFIER
 | Scheduling and live state | Plain TypeScript + database | Computes Now/Next from task state and the clock; SWR refreshes the Command Center every three seconds. |
 | Audit | Plain TypeScript + database | Stores append-only change, apply, notification, and template events for the timeline. |
 
-Task owners use expiring, unguessable links scoped to their assigned tasks. Their Done and Delay actions use the same event versioning and verification rules. If the network drops, organizer updates are queued locally and retried after reconnecting.
+The event-day Command Center is organized as a live runbook: schedule and progress, change desk, prepared Plan B, team links, decision history, and post-event wrap-up. Organizers can mark a task complete directly; completion is recorded as a new version with optimistic concurrency and an audit entry. Schedule changes still go through impact analysis, verified options, and organizer approval. Task owners use expiring, unguessable links scoped to their assigned tasks. If the network drops, organizer updates are queued locally and retried after reconnecting.
 
 ## Vendor search links
 

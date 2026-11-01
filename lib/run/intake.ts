@@ -142,6 +142,7 @@ function resolveTaskTargets(changes: RunChange[], plan: RunPlan): string | null 
 const quickChanges: Record<string, (plan: RunPlan) => RunChange> = {
   "delay-15": (plan) => ({ type: "DELAY", taskId: nextTaskId(plan), minutes: 15, note: "Quick update: delayed 15 minutes" }),
   "delay-30": (plan) => ({ type: "DELAY", taskId: nextTaskId(plan), minutes: 30, note: "Quick update: delayed 30 minutes" }),
+  "task-done": () => ({ type: "TASK_DONE", note: "Task marked complete by organizer" }),
   "vendor-cancelled": () => ({ type: "VENDOR_CANCELLED", note: "Vendor cancelled" }),
   "more-guests": (plan) => ({ type: "GUEST_COUNT", guestCount: plan.guestCount + 10, note: "More guests are attending" }),
   rain: () => ({ type: "WEATHER", note: "Rain reported" }),
