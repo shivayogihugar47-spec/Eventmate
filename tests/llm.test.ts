@@ -30,4 +30,24 @@ describe("llmJson", () => {
 
     expect(mocks.create).toHaveBeenCalledOnce();
   });
+
+  it("gives the fallback model schema correction guidance after invalid JSON data", async () => {
+    mocks.create
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({ ok: "yes" }) } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({ ok: true }) } }],
+      });
+
+    await expect(llmJson(
+      "Test prompt",
+      [{ role: "user", content: "Unique schema correction test" }],
+      z.object({ ok: z.boolean() }),
+    )).resolves.toEqual({ ok: true });
+
+    expect(mocks.create).toHaveBeenCalledTimes(2);
+    expect(mocks.create.mock.calls[1][0].messages[1].content).toContain("did not match the required JSON schema");
+    expect(mocks.create.mock.calls[1][0].messages[1].content).toContain("ok");
+  });
 });

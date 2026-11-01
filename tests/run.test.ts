@@ -522,6 +522,8 @@ describe("RUN risk generation", () => {
     expect(risks).toHaveLength(5);
     expect(risks.every((risk) => risk.status === "ready")).toBe(true);
     expect(mocks.llmJson.mock.calls[0][3]).toEqual({ maxTokens: 3000 });
+    expect(mocks.llmJson.mock.calls[0][0]).toContain("exact field names and JSON types");
+    expect(mocks.llmJson.mock.calls[0][0]).toContain("Task IDs must be copied exactly");
   });
 
   it("does not substitute canned contingencies when the risk model fails", async () => {

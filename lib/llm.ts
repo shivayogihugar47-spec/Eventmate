@@ -70,6 +70,15 @@ function isInsufficientCreditsError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 402;
 }
 
+function validationRetryGuidance(error: unknown): string | undefined {
+  if (!(error instanceof z.ZodError)) return undefined;
+  const issues = error.issues
+    .map((issue) => issue.path.length ? issue.path.join(".") : "response")
+    .slice(0, 20);
+  return `The previous model response did not match the required JSON schema. Correct these fields: ${issues.join(", ")}. ` +
+    "Return the complete corrected JSON object. Preserve exact field names and JSON types; do not omit required fields.";
+}
+
 function retryDelay(error: unknown): number {
   const headers = typeof error === "object" && error !== null && "headers" in error
     ? error.headers
@@ -131,10 +140,14 @@ export async function llmJson<T>(
     content: `${system}\n\nIMPORTANT: Respond with valid JSON only. No markdown, no code fences, no explanation.`,
   };
 
-  async function attempt(m: string): Promise<T> {
+  async function attempt(m: string, correction?: string): Promise<T> {
     const response = await client.chat.completions.create({
       model: m,
-      messages: [systemMessage, ...messages],
+      messages: [
+        systemMessage,
+        ...(correction ? [{ role: "system" as const, content: correction }] : []),
+        ...messages,
+      ],
       response_format: { type: "json_object" },
       ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     });
@@ -156,7 +169,7 @@ export async function llmJson<T>(
       console.warn(`[llmJson] First attempt failed with ${model}, retrying with fallback ${fallbackModel}.`);
       if (isRateLimitError(firstError)) await wait(retryDelay(firstError));
       try {
-        return await attempt(fallbackModel);
+        return await attempt(fallbackModel, validationRetryGuidance(firstError));
       } catch (secondError) {
         console.error("[llmJson] Both model attempts failed.");
         throw secondError;
