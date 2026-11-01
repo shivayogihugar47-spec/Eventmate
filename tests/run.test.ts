@@ -251,6 +251,47 @@ describe("RUN change intake", () => {
     expect(result.changes).toEqual([]);
     expect(result.clarifyingQuestion).toBe("I couldn't read that update clearly. Which task changed, and what is the new time or amount?");
   });
+
+  it("does not report invalid AI-generated options as an invalid change request", async () => {
+    const { z } = await import("zod");
+    const eventId = "00000000-0000-4000-8000-000000000099";
+    mocks.consumeRateLimit.mockResolvedValue(true);
+    mocks.rateLimitIdentity.mockReturnValue("test-client");
+    mocks.loadOrganizerRun.mockResolvedValue({
+      eventId,
+      version: 1,
+      plan: makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]),
+      answers: {},
+      organizerToken: "test-token",
+    });
+    mocks.sql.mockResolvedValue([]);
+    mocks.llmJson
+      .mockResolvedValueOnce({
+        changes: [{ type: "DELAY", taskId: ids.caterer, minutes: 40, note: "Caterer is late" }],
+        clarifyingQuestion: null,
+      })
+      .mockRejectedValueOnce(new z.ZodError([{
+        code: "invalid_type",
+        expected: "number",
+        received: "string",
+        path: ["options", 0, "rupeeImpact"],
+        message: "Expected number, received string",
+      }] as never));
+
+    const response = await intakePost(
+      new Request(`https://eventmate.test/api/run/${eventId}/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: 1, text: "Caterer is 40 minutes late" }),
+      }),
+      { params: { eventId } },
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "I couldn't safely validate an adjustment for that update. Your input is still here—please retry.",
+    });
+  });
 });
 
 describe("RUN risk generation fallback", () => {

@@ -21,8 +21,24 @@ const RequestSchema = z.object({
 type RouteContext = { params: { eventId: string } };
 
 export async function POST(request: Request, { params }: RouteContext) {
+  let rawBody: unknown;
   try {
-    const body = RequestSchema.parse(await request.json());
+    rawBody = await request.json();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "The change request body is not valid JSON." }, { status: 400 });
+    }
+    console.error("[/api/run intake] Unable to read request body.", error);
+    return NextResponse.json({ error: "I couldn't read that change request. Your input is still here—please retry." }, { status: 503 });
+  }
+
+  const parsedBody = RequestSchema.safeParse(rawBody);
+  if (!parsedBody.success) {
+    return NextResponse.json({ error: "The change request is invalid. Check the fields and try again." }, { status: 400 });
+  }
+
+  const body = parsedBody.data;
+  try {
     if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:intake`, 12)) {
       return NextResponse.json({ error: "Too many change requests. Please wait a minute and try again." }, { status: 429 });
     }
@@ -116,7 +132,12 @@ export async function POST(request: Request, { params }: RouteContext) {
     });
   } catch (error) {
     if (error instanceof RunApiError) return NextResponse.json({ error: error.message }, { status: error.status });
-    if (error instanceof z.ZodError) return NextResponse.json({ error: "The change request is invalid. Check the fields and try again." }, { status: 400 });
+    if (error instanceof z.ZodError) {
+      console.error("[/api/run intake] Pipeline data failed schema validation.", error.issues);
+      return NextResponse.json({
+        error: "I couldn't safely validate an adjustment for that update. Your input is still here—please retry.",
+      }, { status: 503 });
+    }
     console.error("[/api/run intake]", error);
     return NextResponse.json({ error: "I couldn't safely prepare that change. Your input is still here—please retry." }, { status: 503 });
   }
