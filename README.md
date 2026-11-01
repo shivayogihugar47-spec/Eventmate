@@ -1,7 +1,7 @@
 # EventMate Live
 
 A conversational AI event-planning assistant for weddings, birthdays, and community events.
-Built with **Next.js 14 (App Router)**, **TypeScript**, **Tailwind CSS**, **Zustand**, **OpenRouter**, and **Neon (serverless Postgres)**.
+Built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, **Zustand**, **OpenRouter**, and **Neon (serverless Postgres)**.
 
 The assistant is fronted by **Diya**, a mood-reactive mascot that celebrates, worries, and comments on the plan as it takes shape.
 
@@ -75,6 +75,10 @@ Task owners use expiring, unguessable links scoped to their assigned tasks. Thei
 
 The Vendors tab creates city- and category-specific search links for the web, Google Maps, Justdial, and WedMeGood. It requires no API key or account setup and does not fetch or republish third-party listings. Justdial and WedMeGood links use a site-filtered web search. Search results are external and are not verified by EventMate; confirm services, availability, and pricing directly with each business.
 
+## Accounts and saved events
+
+Email/password accounts use Neon Managed Auth. Sign in before starting a plan; each locked event is linked to the account that created it. **My saved events** lists that account's plans, and reopening an event loads its latest saved plan version. Event APIs verify either the organizer's existing bearer token or the signed-in account that owns the event. Legacy events created before account ownership was added are not automatically assigned to a user.
+
 ---
 
 ## Manual Setup Steps
@@ -119,7 +123,17 @@ NEON_FUNCTION_HELLO_BASE_URL=
 
 > `.env.local` is git-ignored. Never commit real keys.
 
-### 4 — Run the database migration
+### 4 — Configure authentication
+
+Managed Neon Auth is enabled for the production branch. Set `NEON_AUTH_COOKIE_SECRET` to a random secret of at least 32 characters in `.env.local` and in the app host's server environment. A local secret can be generated with:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Email/password sign-up and sign-in use Neon Auth. Users can create and reopen their own saved events from **My saved events**. New event plans are associated with the signed-in account; legacy events without an owner remain unchanged.
+
+### 5 — Run the database migration
 
 ```bash
 npm run db:migrate
@@ -128,7 +142,7 @@ npm run db:migrate
 This reads `db/schema.sql` and creates all tables on your Neon database.
 Safe to re-run – all tables use `CREATE TABLE IF NOT EXISTS`.
 
-### 5 — Start the dev server
+### 6 — Start the dev server
 
 ```bash
 npm run dev
@@ -221,7 +235,7 @@ Diya is a stateful, mood-reactive companion implemented in `components/diya/`.
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 14 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS, Inter / Plus Jakarta Sans |
 | Animation | Framer Motion |

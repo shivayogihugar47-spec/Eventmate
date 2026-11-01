@@ -15,6 +15,7 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/llm", () => ({ llmJson: mocks.llmJson }));
 vi.mock("@/lib/run/security", () => ({
   loadOrganizerRun: mocks.loadOrganizerRun,
+  loadOwnedOrganizerRun: mocks.loadOrganizerRun,
   consumeRateLimit: mocks.consumeRateLimit,
   rateLimitIdentity: mocks.rateLimitIdentity,
 }));
@@ -224,7 +225,7 @@ describe("RUN change intake", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version: 1, text: "Caterer is hours late" }),
       }),
-      { params: { eventId } },
+      { params: Promise.resolve({ eventId }) },
     );
 
     expect(response.status).toBe(200);
@@ -297,7 +298,7 @@ describe("RUN change intake", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version: 1, text: "Caterer is 40 minutes late" }),
       }),
-      { params: { eventId } },
+      { params: Promise.resolve({ eventId }) },
     );
 
     expect(response.status).toBe(200);
@@ -452,7 +453,7 @@ describe("RUN version control", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version: 2, text: "The caterer is late" }),
       }),
-      { params: { eventId: "event" } },
+      { params: Promise.resolve({ eventId: "event" }) },
     );
 
     expect(response.status).toBe(409);

@@ -34,6 +34,7 @@ export async function saveLockedRun(
   plan: RunPlan,
   answers: Record<string, unknown>,
   risks: { title: string; triggerType: string; likelihood: string; backupAction: unknown[] }[],
+  ownerUserId: string,
 ): Promise<{ eventId: string; organizerToken: string; version: number; ownerLinks: { owner: string; token: string; taskIds: string[]; expiresAt: string }[] }> {
   const eventId = crypto.randomUUID();
   const organizerToken = createBearerToken();
@@ -66,9 +67,9 @@ export async function saveLockedRun(
 
   await sql.transaction([
     sql`INSERT INTO events
-      (id, stage, answers, event_type, event_date, budget_total, current_plan_version, organizer_token_hash, event_end_at, venue_closes_at, outdoor)
+      (id, stage, answers, event_type, event_date, budget_total, current_plan_version, organizer_token_hash, owner_user_id, event_end_at, venue_closes_at, outdoor)
       VALUES (${eventId}, 'run', ${JSON.stringify(answers)}, ${plan.eventType}, ${plan.eventDate},
-        ${plan.budgetTotal}, 1, ${hashToken(organizerToken)}, ${plan.constraints?.eventEndsAt ?? null},
+        ${plan.budgetTotal}, 1, ${hashToken(organizerToken)}, ${ownerUserId}, ${plan.constraints?.eventEndsAt ?? null},
         ${plan.constraints?.venueClosesAt ?? null}, ${Boolean(plan.constraints?.outdoor)})`,
     sql`INSERT INTO plan_versions (event_id, version, plan, change_note)
       VALUES (${eventId}, 1, ${JSON.stringify(plan)}, 'Plan locked')`,
@@ -124,6 +125,32 @@ export async function loadOrganizerRun(request: Request, eventId: string): Promi
     answers: stored[0].answers as Record<string, unknown>,
     organizerToken: bearer,
   };
+}
+
+export async function loadOwnedOrganizerRun(request: Request, eventId: string): Promise<OrganizerRun> {
+  try {
+    return await loadOrganizerRun(request, eventId);
+  } catch (bearerError) {
+    const { getAuthenticatedUser } = await import("@/lib/auth/server");
+    const user = await getAuthenticatedUser();
+    if (!user) throw bearerError;
+
+    const events = await sql`SELECT owner_user_id, current_plan_version, answers
+      FROM events WHERE id = ${eventId} LIMIT 1`;
+    if (!events[0] || events[0].owner_user_id !== user.id) throw bearerError;
+
+    const version = Number(events[0].current_plan_version);
+    const rows = await sql`SELECT plan FROM plan_versions
+      WHERE event_id = ${eventId} AND version = ${version} LIMIT 1`;
+    if (!rows[0]?.plan) throw new Error("The current event plan is unavailable.");
+    return {
+      eventId,
+      version,
+      plan: rows[0].plan as RunPlan,
+      answers: events[0].answers as Record<string, unknown>,
+      organizerToken: "",
+    };
+  }
 }
 
 export async function loadOwnerRun(token: string): Promise<OwnerRun> {

@@ -8,17 +8,18 @@ const RevertSchema = z.object({
   idempotencyKey: z.string().min(8).max(128).regex(/^[A-Za-z0-9._:-]+$/),
 });
 
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
   try {
     const body = RevertSchema.parse(await request.json());
-    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:revert`, 5)) {
+    if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:revert`, 5)) {
       return NextResponse.json({ error: "Too many revert attempts. Try again shortly." }, { status: 429 });
     }
     const result = await revertToPreviousVersion({
       request,
-      eventId: params.eventId,
+      eventId,
       expectedVersion: body.version,
       idempotencyKey: body.idempotencyKey,
     });

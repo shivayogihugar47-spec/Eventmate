@@ -2,17 +2,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { llmJson } from "@/lib/llm";
-import { consumeRateLimit, loadOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
+import { consumeRateLimit, loadOwnedOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
 import { RunApiError } from "@/lib/run/apply";
 
 const LessonsSchema = z.object({
   lessons: z.array(z.string().min(4).max(240)).min(2).max(5),
 });
 const TemplateSchema = z.object({ name: z.string().trim().min(2).max(80) });
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
 async function buildSummary(eventId: string, request: Request) {
-  const run = await loadOrganizerRun(request, eventId);
+  const run = await loadOwnedOrganizerRun(request, eventId);
   const [taskRows, expenseRows, budgetRows, changeRows] = await Promise.all([
     sql`SELECT title, start_time, end_time, actual_end_time, status
       FROM tasks WHERE event_id = ${eventId} ORDER BY start_time`,
@@ -49,12 +49,13 @@ async function buildSummary(eventId: string, request: Request) {
   return { ...core, lessons: lessons.lessons };
 }
 
-export async function GET(request: Request, { params }: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
   try {
-    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:summary`, 6)) {
+    if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:summary`, 6)) {
       return NextResponse.json({ error: "Too many summary requests. Try again shortly." }, { status: 429 });
     }
-    return NextResponse.json(await buildSummary(params.eventId, request));
+    return NextResponse.json(await buildSummary(eventId, request));
   } catch (error) {
     if (error instanceof RunApiError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("[/api/run summary]", error);
@@ -62,13 +63,14 @@ export async function GET(request: Request, { params }: RouteContext) {
   }
 }
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
   try {
     const body = TemplateSchema.parse(await request.json());
-    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:template`, 3)) {
+    if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:template`, 3)) {
       return NextResponse.json({ error: "Too many template requests. Try again shortly." }, { status: 429 });
     }
-    const run = await loadOrganizerRun(request, params.eventId);
+    const run = await loadOwnedOrganizerRun(request, eventId);
     const structure = {
       eventType: run.plan.eventType,
       theme: run.plan.theme,
@@ -79,9 +81,9 @@ export async function POST(request: Request, { params }: RouteContext) {
       budgetBreakdown: run.plan.budgetBreakdown.map(({ category, percentage, icon }) => ({ category, percentage, icon })),
     };
     const inserted = await sql`INSERT INTO event_templates (event_id, name, structure)
-      VALUES (${params.eventId}, ${body.name}, ${JSON.stringify(structure)}::jsonb) RETURNING id`;
+      VALUES (${eventId}, ${body.name}, ${JSON.stringify(structure)}::jsonb) RETURNING id`;
     await sql`INSERT INTO plan_events (event_id, type, payload, actor)
-      VALUES (${params.eventId}, 'TEMPLATE_SAVED', ${JSON.stringify({ templateId: inserted[0].id, name: body.name })}::jsonb, 'organizer')`;
+      VALUES (${eventId}, 'TEMPLATE_SAVED', ${JSON.stringify({ templateId: inserted[0].id, name: body.name })}::jsonb, 'organizer')`;
     return NextResponse.json({ templateId: inserted[0].id, name: body.name }, { status: 201 });
   } catch (error) {
     if (error instanceof RunApiError) return NextResponse.json({ error: error.message }, { status: error.status });

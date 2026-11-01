@@ -10,7 +10,7 @@ import { consumeRateLimit, loadOwnerRun } from "@/lib/run/security";
 import { draftOwnerNotifications } from "@/lib/run/notify";
 import { createHash } from "node:crypto";
 
-type RouteContext = { params: { token: string } };
+type RouteContext = { params: Promise<{ token: string }> };
 
 const OwnerActionSchema = z.object({
   action: z.enum(["done", "delay-15", "delay-30"]),
@@ -25,12 +25,13 @@ function tokenBucket(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(_request: Request, context: RouteContext) {
+  const { token } = await context.params;
   try {
-    if (!await consumeRateLimit(`owner:${tokenBucket(params.token)}:poll`, 40)) {
+    if (!await consumeRateLimit(`owner:${tokenBucket(token)}:poll`, 40)) {
       return NextResponse.json({ error: "Too many refreshes. Try again shortly." }, { status: 429 });
     }
-    const owner = await loadOwnerRun(params.token);
+    const owner = await loadOwnerRun(token);
     const ownTasks = owner.plan.timeline.filter((task) => owner.taskIds.includes(task.id));
     return NextResponse.json({
       eventId: owner.eventId,
@@ -47,12 +48,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const { token } = await context.params;
   try {
-    if (!await consumeRateLimit(`owner:${tokenBucket(params.token)}:action`, 12)) {
+    if (!await consumeRateLimit(`owner:${tokenBucket(token)}:action`, 12)) {
       return NextResponse.json({ error: "Too many task updates. Try again shortly." }, { status: 429 });
     }
-    const owner = await loadOwnerRun(params.token);
+    const owner = await loadOwnerRun(token);
     const body = OwnerActionSchema.parse(await request.json());
     if (!owner.taskIds.includes(body.taskId)) throw new RunApiError("This task is not assigned to this owner link.", 403);
     if (owner.version !== body.version) {

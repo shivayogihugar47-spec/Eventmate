@@ -4,12 +4,12 @@ import { normalizeBudget, scheduleTasks, parseBudget } from "../lib/stages/plan"
 
 describe("Plan Logic", () => {
   it("should normalize budget to sum exactly to total", () => {
-    const raw = [
+    const raw: Parameters<typeof normalizeBudget>[0] = [
       { category: "Food", weight: 5, icon: "utensils", notes: "" },
       { category: "Decor", weight: 3, icon: "flower2", notes: "" },
     ];
     const total = 800000;
-    const normalized = normalizeBudget(raw as any, total, ["Food", "Decor"]);
+    const normalized = normalizeBudget(raw, total, ["Food", "Decor"]);
     
     const sum = normalized.reduce((s, item) => s + item.allocated, 0);
     expect(sum).toBe(total);
@@ -50,12 +50,12 @@ describe("Plan Logic", () => {
   });
 
   it("should schedule tasks backward from event date", () => {
-    const tasks = [
+    const tasks: Parameters<typeof scheduleTasks>[0] = [
       { task: "Task 1", durationDays: 10, dependsOnIndex: null, owner: "", description: "", icon: "" },
       { task: "Task 2", durationDays: 5, dependsOnIndex: 0, owner: "", description: "", icon: "" },
     ];
     const eventDate = "2026-12-01";
-    const timeline = scheduleTasks(tasks as any, eventDate);
+    const timeline = scheduleTasks(tasks, eventDate);
     
     expect(timeline.length).toBe(2);
     // Task 2 ends at eventDate, starts 5 days before

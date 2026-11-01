@@ -12,17 +12,18 @@ const ApplySchema = z.object({
   idempotencyKey: z.string().min(8).max(128).regex(/^[A-Za-z0-9._:-]+$/),
 });
 
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
   try {
     const body = ApplySchema.parse(await request.json());
-    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:apply`, 10)) {
+    if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:apply`, 10)) {
       return NextResponse.json({ error: "Too many apply attempts. Try again shortly." }, { status: 429 });
     }
     const result = await applyProposal({
       request,
-      eventId: params.eventId,
+      eventId,
       proposalId: body.proposalId,
       optionIndex: body.optionIndex,
       expectedVersion: body.version,
@@ -34,13 +35,13 @@ export async function POST(request: Request, { params }: RouteContext) {
     if (!result.idempotent) {
       try {
         notifications = await draftOwnerNotifications(
-          params.eventId,
+          eventId,
           result.plan,
           result.changes,
           result.option.report.affectedTasks.map((task) => task.id),
         );
         await sql`INSERT INTO plan_events (event_id, type, payload, actor)
-          VALUES (${params.eventId}, 'NOTIFY', ${JSON.stringify({
+          VALUES (${eventId}, 'NOTIFY', ${JSON.stringify({
             version: result.version,
             taskIds: notifications.map((message) => message.taskId),
           })}::jsonb, 'system')`;
@@ -48,7 +49,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         console.error("[/api/run apply notify]", error);
         notificationError = "The change was applied, but message drafts could not be prepared. Use Retry notifications.";
         await sql`INSERT INTO plan_events (event_id, type, payload, actor)
-          VALUES (${params.eventId}, 'NOTIFY_FAILED', ${JSON.stringify({ version: result.version })}::jsonb, 'system')`;
+          VALUES (${eventId}, 'NOTIFY_FAILED', ${JSON.stringify({ version: result.version })}::jsonb, 'system')`;
       }
     }
 

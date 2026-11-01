@@ -6,6 +6,7 @@ import { buildNextEventQuestion, type EventChatMessage } from "@/lib/eventQuesti
 import { normalizePlanForRun } from "@/lib/run/plan";
 import { generateRisks } from "@/lib/run/risks";
 import { saveLockedRun } from "@/lib/run/security";
+import { getAuthenticatedUser } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +151,10 @@ export async function POST(request: Request) {
 
     // ── Plan generation mode ────────────────────────────────────────────────
     if (generatingPlan && body.planData) {
+      const user = await getAuthenticatedUser();
+      if (!user) {
+        return NextResponse.json({ error: "Sign in to save and generate your event plan." }, { status: 401 });
+      }
       failureStage = "AI plan generation";
       const plan = await llmJson(
         "You are a professional event planner. Return a detailed plan that matches the exact JSON structure requested by the user.",
@@ -163,7 +168,7 @@ export async function POST(request: Request) {
       failureStage = "contingency generation";
       const risks = await generateRisks(runPlan);
       failureStage = "saving the locked plan";
-      const run = await saveLockedRun(runPlan, body.planData, risks);
+      const run = await saveLockedRun(runPlan, body.planData, risks, user.id);
       return NextResponse.json({ plan: runPlan, run: { ...run, risks } });
     }
 

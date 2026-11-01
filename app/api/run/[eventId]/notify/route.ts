@@ -3,7 +3,7 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { RunApiError } from "@/lib/run/apply";
 import { draftOwnerNotifications } from "@/lib/run/notify";
-import { consumeRateLimit, loadOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
+import { consumeRateLimit, loadOwnedOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
 import { ChangeSchema } from "@/lib/run/types";
 
 const NotifySchema = z.object({
@@ -12,19 +12,20 @@ const NotifySchema = z.object({
   taskIds: z.array(z.string().uuid()).max(40),
 });
 
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
   try {
     const body = NotifySchema.parse(await request.json());
-    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:notify`, 8)) {
+    if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:notify`, 8)) {
       return NextResponse.json({ error: "Too many notification retries. Try again shortly." }, { status: 429 });
     }
-    const run = await loadOrganizerRun(request, params.eventId);
+    const run = await loadOwnedOrganizerRun(request, eventId);
     if (run.version !== body.version) throw new RunApiError("The plan changed. Refresh before retrying notifications.", 409);
-    const messages = await draftOwnerNotifications(params.eventId, run.plan, body.changes, body.taskIds);
+    const messages = await draftOwnerNotifications(eventId, run.plan, body.changes, body.taskIds);
     await sql`INSERT INTO plan_events (event_id, type, payload, actor)
-      VALUES (${params.eventId}, 'NOTIFY', ${JSON.stringify({
+      VALUES (${eventId}, 'NOTIFY', ${JSON.stringify({
         version: run.version,
         taskIds: messages.map((message) => message.taskId),
       })}::jsonb, 'system')`;

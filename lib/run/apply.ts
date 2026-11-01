@@ -2,7 +2,7 @@ import { sql } from "@/lib/db";
 import { analyzeImpact } from "./impact";
 import { verifyOptions } from "./verify";
 import type { RunChange, RunOption, RunPlan, VerifiedOption } from "./types";
-import { loadOrganizerRun } from "./security";
+import { loadOwnedOrganizerRun } from "./security";
 
 export class RunApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -125,7 +125,7 @@ export async function applyProposal(input: {
   expectedVersion: number;
   idempotencyKey: string;
 }): Promise<{ version: number; plan: RunPlan; option: VerifiedOption; changes: RunChange[]; idempotent: boolean }> {
-  const run = await loadOrganizerRun(input.request, input.eventId);
+  const run = await loadOwnedOrganizerRun(input.request, input.eventId);
   return applySelectedProposal({ ...input, run, actor: "organizer" });
 }
 
@@ -189,7 +189,7 @@ export async function revertToPreviousVersion(input: {
   expectedVersion: number;
   idempotencyKey: string;
 }): Promise<{ version: number; plan: RunPlan; idempotent: boolean }> {
-  const run = await loadOrganizerRun(input.request, input.eventId);
+  const run = await loadOwnedOrganizerRun(input.request, input.eventId);
   const replay = await sql`SELECT event_id, version, result FROM run_apply_requests WHERE idempotency_key = ${input.idempotencyKey} LIMIT 1`;
   if (replay[0]) {
     if (replay[0].event_id !== input.eventId) throw new RunApiError("This request key belongs to another event.", 409);

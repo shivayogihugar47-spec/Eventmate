@@ -43,9 +43,13 @@ describe("RUN owner-link persistence", () => {
       checklist: [],
     };
 
-    await saveLockedRun(plan, {}, []);
+    await saveLockedRun(plan, {}, [], "test-user-id");
 
     const values = mocks.sql.mock.calls.flatMap((call) => call.slice(1));
+    const eventInsert = mocks.sql.mock.calls.find((call) =>
+      call[0].join("").includes("owner_user_id"),
+    );
+    expect(eventInsert?.slice(1)).toContain("test-user-id");
     const ownerLinksJson = values.find(
       (value): value is string => typeof value === "string" && value.includes('"expires_at"'),
     );

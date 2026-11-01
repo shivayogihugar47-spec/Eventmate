@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS events (
   budget_total NUMERIC,
   current_plan_version INT NOT NULL DEFAULT 0,
   organizer_token_hash TEXT,
+  owner_user_id TEXT,
   event_end_at TIMESTAMPTZ,
   venue_closes_at TEXT,
   outdoor BOOLEAN NOT NULL DEFAULT FALSE,
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS plan_versions (
 
 ALTER TABLE events ADD COLUMN IF NOT EXISTS current_plan_version INT NOT NULL DEFAULT 0;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_token_hash TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_user_id TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_end_at TIMESTAMPTZ;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS venue_closes_at TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS outdoor BOOLEAN NOT NULL DEFAULT FALSE;
@@ -98,6 +100,7 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS actual_start_time TIMESTAMPTZ;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS actual_end_time TIMESTAMPTZ;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS vendor_name TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS plan_versions_event_version_idx ON plan_versions(event_id, version);
+CREATE INDEX IF NOT EXISTS events_owner_created_idx ON events(owner_user_id, created_at DESC);
 
 -- Append-only history. The restrictive foreign key prevents an event deletion
 -- from cascading into the audit log.

@@ -5,7 +5,7 @@ import { analyzeImpact } from "@/lib/run/impact";
 import { parseChangeText, parseQuickChange } from "@/lib/run/intake";
 import { generateOptions } from "@/lib/run/options";
 import { verifyOptions, deterministicShiftOption } from "@/lib/run/verify";
-import { consumeRateLimit, loadOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
+import { consumeRateLimit, loadOwnedOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
 import type { PlanRisk, RunChange, RunOption } from "@/lib/run/types";
 import { RunApiError } from "@/lib/run/apply";
 
@@ -18,9 +18,10 @@ const RequestSchema = z.object({
   message: "Provide either a change description or a quick action.",
 });
 
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
   let rawBody: unknown;
   try {
     rawBody = await request.json();
@@ -39,10 +40,10 @@ export async function POST(request: Request, { params }: RouteContext) {
 
   const body = parsedBody.data;
   try {
-    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:intake`, 12)) {
+    if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:intake`, 12)) {
       return NextResponse.json({ error: "Too many change requests. Please wait a minute and try again." }, { status: 429 });
     }
-    const run = await loadOrganizerRun(request, params.eventId);
+    const run = await loadOwnedOrganizerRun(request, eventId);
     if (run.version !== body.version) {
       return NextResponse.json({ error: "The plan changed. Refresh to see the latest version.", stale: true }, { status: 409 });
     }

@@ -1,23 +1,24 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { loadOrganizerRun, consumeRateLimit, rateLimitIdentity } from "@/lib/run/security";
+import { loadOwnedOrganizerRun, consumeRateLimit, rateLimitIdentity } from "@/lib/run/security";
 
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
-export async function GET(request: Request, { params }: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
   try {
-    const run = await loadOrganizerRun(request, params.eventId);
-    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:poll`, 40)) {
+    const run = await loadOwnedOrganizerRun(request, eventId);
+    if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:poll`, 40)) {
       return NextResponse.json({ error: "Too many refreshes. Try again shortly." }, { status: 429 });
     }
     const [eventRows, riskRows, auditRows, ownerRows] = await Promise.all([
-      sql`SELECT event_type, event_date, current_plan_version FROM events WHERE id = ${params.eventId} LIMIT 1`,
+      sql`SELECT event_type, event_date, current_plan_version FROM events WHERE id = ${eventId} LIMIT 1`,
       sql`SELECT id, title, trigger_type, likelihood, backup_action, status FROM risks
-        WHERE event_id = ${params.eventId} ORDER BY created_at`,
+        WHERE event_id = ${eventId} ORDER BY created_at`,
       sql`SELECT id, type, payload, actor, created_at FROM plan_events
-        WHERE event_id = ${params.eventId} ORDER BY created_at DESC LIMIT 100`,
+        WHERE event_id = ${eventId} ORDER BY created_at DESC LIMIT 100`,
       sql`SELECT token, task_ids, expires_at FROM owner_links
-        WHERE event_id = ${params.eventId} AND expires_at > now()`,
+        WHERE event_id = ${eventId} AND expires_at > now()`,
     ]);
     return NextResponse.json({
       eventId: run.eventId,

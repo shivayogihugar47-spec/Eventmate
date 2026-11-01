@@ -17,6 +17,8 @@ import { formatINR } from "@/lib/budget";
 import { CommandCenter } from "@/components/diya/CommandCenter";
 import type { RunPlan } from "@/lib/run/types";
 import { getVendorSearchLinks, VENDOR_CATEGORIES } from "@/lib/vendorCategories";
+import { AuthDialog, type AccountUser } from "@/components/auth/AuthDialog";
+import { authClient } from "@/lib/auth/client";
 
 // ── Dynamic imports (SSR safe) ────────────────────────────────────────────────
 const Diya    = dynamic(() => import("@/components/diya/Diya").then(m => m.Diya), { ssr: false });
@@ -706,7 +708,28 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
 // ═══════════════════════════════════════════════════════════════════════════
 // LANDING
 // ═══════════════════════════════════════════════════════════════════════════
-function Landing({ onStart }:{ onStart:(t?:string,l?:string)=>void }) {
+interface SavedEventSummary {
+  id: string;
+  eventType: string;
+  eventDate: string;
+  city: string;
+  budgetTotal: number;
+  version: number;
+  createdAt: string;
+}
+
+interface LandingProps {
+  onStart: (type?: string, label?: string) => void;
+  user: AccountUser | null;
+  events: SavedEventSummary[];
+  eventsLoading: boolean;
+  eventsError: string;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  onOpenEvent: (eventId: string) => void;
+}
+
+function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, onSignOut, onOpenEvent }: LandingProps) {
   const [lit, setLit] = useState(false);
   const [activeMoment, setActiveMoment] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<{type:string;label:string}|null>(null);
@@ -781,12 +804,53 @@ function Landing({ onStart }:{ onStart:(t?:string,l?:string)=>void }) {
           <a href="#plan-preview" className="text-xs font-bold text-[#68736D] transition-colors hover:text-[#214E43]">What you&apos;ll get</a>
           <a href="#how-it-works" className="text-xs font-bold text-[#68736D] transition-colors hover:text-[#214E43]">How it works</a>
         </div>
-        <motion.button onClick={()=>onStart()}
-          whileHover={{y:-2}} whileTap={{y:1,scale:0.97}}
-          className="flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-xl bg-[#214E43] hover:bg-[#173D34] transition-colors">
-          <Wand2 size={14}/> Start Planning
-        </motion.button>
+        <div className="flex items-center gap-2">
+          {user ? (
+            <>
+              <span className="hidden max-w-36 truncate text-xs font-bold text-[#52645A] sm:inline" title={user.email}>{user.name || user.email}</span>
+              <button type="button" onClick={onSignOut} className="rounded-xl border border-[#D8D6CD] bg-white px-3 py-2.5 text-xs font-bold text-[#52645A] transition hover:border-[#A77D2B]/60 hover:text-[#173F35]">Sign out</button>
+            </>
+          ) : (
+            <button type="button" onClick={onSignIn} className="rounded-xl border border-[#D8D6CD] bg-white px-3 py-2.5 text-xs font-bold text-[#52645A] transition hover:border-[#A77D2B]/60 hover:text-[#173F35]">Sign in</button>
+          )}
+          <motion.button onClick={()=>onStart()}
+            whileHover={{y:-2}} whileTap={{y:1,scale:0.97}}
+            className="flex items-center gap-2 rounded-xl bg-[#214E43] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#173D34]">
+            <Wand2 size={14}/> Start Planning
+          </motion.button>
+        </div>
       </nav>
+
+      {user && (
+        <section className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-6 sm:px-8" aria-labelledby="saved-events-title">
+          <div className="rounded-2xl border border-[#E5E0D3] bg-white/90 p-4 shadow-sm sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 id="saved-events-title" className="font-display text-base font-extrabold text-[#202B27]">My saved events</h2>
+                <p className="mt-0.5 text-xs text-[#778078]">Your plans are saved to your account.</p>
+              </div>
+              <span className="rounded-full bg-[#F1F4EF] px-3 py-1 text-[10px] font-extrabold text-[#52645A]">{events.length} saved</span>
+            </div>
+            {eventsError && <p role="alert" className="mt-3 text-xs text-[#9A4938]">{eventsError}</p>}
+            {eventsLoading ? (
+              <p className="mt-4 text-xs text-[#778078]">Loading your events…</p>
+            ) : events.length ? (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {events.map((event) => (
+                  <button key={event.id} type="button" onClick={() => onOpenEvent(event.id)}
+                    className="rounded-xl border border-[#E7E4DB] bg-[#FFFEFA] p-3 text-left transition hover:border-[#B9C9BD] hover:bg-[#F7F9F5]">
+                    <span className="block font-display text-sm font-extrabold capitalize text-[#214E43]">{event.eventType}</span>
+                    <span className="mt-1 block text-xs text-[#68736D]">{[event.city, event.eventDate].filter(Boolean).join(" · ")}</span>
+                    <span className="mt-2 block text-[10px] font-bold text-[#A77D2B]">Version {event.version} · {formatINR(event.budgetTotal)}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-[#778078]">Your first event plan will appear here. Start planning whenever you&apos;re ready.</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* HERO */}
       <section className="relative z-10 max-w-7xl mx-auto px-5 pt-5 pb-10 sm:px-8 sm:pt-10 sm:pb-14 grid grid-cols-1 lg:grid-cols-[0.94fr_1.06fr] items-center gap-8 lg:gap-12">
@@ -1062,7 +1126,7 @@ function Landing({ onStart }:{ onStart:(t?:string,l?:string)=>void }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // EVENT STUDIO
 // ═══════════════════════════════════════════════════════════════════════════
-function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string; initialLabel?:string; onBack:()=>void }) {
+function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initialType?:string; initialLabel?:string; onBack:()=>void; onEventSaved:()=>void }) {
   const [currentCard, setCurrentCard]   = useState<AssistantCard|null>(null);
   const [answers, setAnswers]           = useState<AnswerEntry[]>(()=>initialType?[{step:1,display:initialLabel??initialType,raw:initialType}]:[]);
   const [collectedData, setCollected]   = useState<EventCollectedData>({
@@ -1190,12 +1254,13 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
       }
       setPlan(payload.plan);
       setRunSession({eventId:payload.run.eventId,organizerToken:payload.run.organizerToken,plan:payload.plan});
+      onEventSaved();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong generating the plan. Please try again.";
       setGenerationError(message);
       say(message, "worried", 5000);
     } finally { setIsGenerating(false); }
-  },[readyToGen,isGenerating,history,collectedData,say]);
+  },[readyToGen,isGenerating,history,collectedData,say,onEventSaved]);
 
   if (plan && runSession && showCommandCenter) {
     return <CommandCenter
@@ -1407,22 +1472,144 @@ export default function App() {
   const [screen, setScreen] = useState<"landing"|"studio">("landing");
   const [initType, setInitType] = useState<string|undefined>();
   const [initLabel, setInitLabel] = useState<string|undefined>();
+  const [account, setAccount] = useState<AccountUser|null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [pendingStart, setPendingStart] = useState<{type?:string;label?:string}|null>(null);
+  const [savedEvents, setSavedEvents] = useState<SavedEventSummary[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState("");
+  const [activeSavedRun, setActiveSavedRun] = useState<{eventId:string;plan:RunPlan}|null>(null);
+  const [savedRunView, setSavedRunView] = useState(false);
+  const [openingEvent, setOpeningEvent] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    authClient.getSession()
+      .then(({ data, error }) => {
+        if (error) throw new Error(error.message);
+        const user = data?.user;
+        if (active && user) setAccount({ id: user.id, email: user.email, name: user.name });
+      })
+      .catch((error: unknown) => {
+        console.error("[auth] Unable to restore the current session.", error);
+        if (active) setEventsError("We couldn't check your sign-in status. Please refresh and try again.");
+      })
+      .finally(() => { if (active) setAuthLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const refreshSavedEvents = useCallback(async () => {
+    if (!account) return;
+    setEventsLoading(true);
+    setEventsError("");
+    try {
+      const response = await fetch("/api/events");
+      const result = await response.json() as { events?:SavedEventSummary[]; error?:string };
+      if (!response.ok) throw new Error(result.error ?? "Unable to load saved events.");
+      setSavedEvents(result.events ?? []);
+    } catch (error) {
+      setEventsError(error instanceof Error ? error.message : "Unable to load saved events. Please retry.");
+    } finally {
+      setEventsLoading(false);
+    }
+  }, [account]);
+
+  useEffect(() => {
+    if (account) {
+      void refreshSavedEvents();
+    } else {
+      setSavedEvents([]);
+      setEventsLoading(false);
+    }
+  }, [account, refreshSavedEvents]);
 
   const handleStart = useCallback((type?:string, label?:string)=>{
-    setInitType(type); setInitLabel(label); setScreen("studio");
-  },[]);
+    if (authLoading) return;
+    if (!account) {
+      setPendingStart({type,label});
+      setAuthDialogOpen(true);
+      return;
+    }
+    setInitType(type);
+    setInitLabel(label);
+    setScreen("studio");
+  },[account,authLoading]);
+
+  const handleAuthenticated = (user: AccountUser) => {
+    setAccount(user);
+    setAuthDialogOpen(false);
+    if (pendingStart) {
+      setInitType(pendingStart.type);
+      setInitLabel(pendingStart.label);
+      setScreen("studio");
+      setPendingStart(null);
+    }
+  };
+
+  const handleSignOut = async () => {
+    const result = await authClient.signOut();
+    if (result.error) {
+      setEventsError(result.error.message || "Unable to sign out. Please try again.");
+      return;
+    }
+    setAccount(null);
+    setEventsError("");
+  };
+
+  const openSavedEvent = async (eventId: string) => {
+    setOpeningEvent(true);
+    setEventsError("");
+    try {
+      const response = await fetch(`/api/run/${eventId}`, { headers: { Authorization: "Bearer session" } });
+      const result = await response.json() as { plan?:RunPlan; error?:string };
+      if (!response.ok || !result.plan) throw new Error(result.error ?? "Unable to open this saved event.");
+      setActiveSavedRun({ eventId, plan: result.plan });
+      setSavedRunView(false);
+    } catch (error) {
+      setEventsError(error instanceof Error ? error.message : "Unable to open the saved event. Please retry.");
+    } finally {
+      setOpeningEvent(false);
+    }
+  };
+
+  if (activeSavedRun) {
+    return savedRunView ? (
+      <CommandCenter eventId={activeSavedRun.eventId} organizerToken="session" plan={activeSavedRun.plan} onBack={() => setSavedRunView(false)}/>
+    ) : (
+      <PlanReveal plan={activeSavedRun.plan} onBack={() => setActiveSavedRun(null)} onStartRun={() => setSavedRunView(true)}/>
+    );
+  }
 
   return (
-    <AnimatePresence mode="wait">
-      {screen==="landing"?(
-        <motion.div key="landing" className="landing-screen" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0,y:-20}}>
-          <Landing onStart={handleStart}/>
-        </motion.div>
-      ):(
-        <motion.div key="studio" initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-          <EventStudio initialType={initType} initialLabel={initLabel} onBack={()=>setScreen("landing")}/>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait">
+        {screen==="landing"?(
+          <motion.div key="landing" className="landing-screen" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0,y:-20}}>
+            <Landing
+              onStart={handleStart}
+              user={account}
+              events={savedEvents}
+              eventsLoading={eventsLoading || authLoading}
+              eventsError={eventsError}
+              onSignIn={() => setAuthDialogOpen(true)}
+              onSignOut={() => void handleSignOut()}
+              onOpenEvent={(eventId) => void openSavedEvent(eventId)}
+            />
+            {openingEvent && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#16231F]/25 text-sm font-bold text-white" role="status">Opening your saved event…</div>}
+          </motion.div>
+        ):(
+          <motion.div key="studio" initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
+            <EventStudio
+              initialType={initType}
+              initialLabel={initLabel}
+              onBack={()=>setScreen("landing")}
+              onEventSaved={() => void refreshSavedEvents()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {authDialogOpen && <AuthDialog onClose={() => { setAuthDialogOpen(false); setPendingStart(null); }} onAuthenticated={handleAuthenticated}/>}
+    </>
   );
 }
