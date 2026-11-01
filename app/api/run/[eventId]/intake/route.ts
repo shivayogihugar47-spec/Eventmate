@@ -6,7 +6,7 @@ import { parseChangeText, parseQuickChange } from "@/lib/run/intake";
 import { generateOptions } from "@/lib/run/options";
 import { verifyOptions, deterministicShiftOption } from "@/lib/run/verify";
 import { consumeRateLimit, loadOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
-import type { PlanRisk, RunChange } from "@/lib/run/types";
+import type { PlanRisk, RunChange, RunOption } from "@/lib/run/types";
 import { RunApiError } from "@/lib/run/apply";
 
 const RequestSchema = z.object({
@@ -89,7 +89,16 @@ export async function POST(request: Request, { params }: RouteContext) {
       run.plan.constraints?.eventEndsAt ? `Event ends at ${run.plan.constraints.eventEndsAt}` : "",
     ].filter(Boolean);
 
-    let options = await generateOptions({ plan: run.plan, changes, impact, risks, priorities, constraints });
+    let options: RunOption[];
+    try {
+      options = await generateOptions({ plan: run.plan, changes, impact, risks, priorities, constraints });
+    } catch (error) {
+      if (!(error instanceof z.ZodError)) throw error;
+      console.warn("[/api/run intake] Option output failed validation; trying a deterministic schedule-only fallback.", error.issues);
+      const fallback = deterministicShiftOption(run.plan, changes, impact);
+      if (!fallback) throw error;
+      options = [fallback];
+    }
     let verification = verifyOptions(run.plan, changes, impact, options);
     if (verification.verified.length === 0) {
       options = await generateOptions({

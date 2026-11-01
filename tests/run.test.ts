@@ -21,6 +21,7 @@ vi.mock("@/lib/run/security", () => ({
 
 import { detectViolations, analyzeImpact } from "@/lib/run/impact";
 import { parseChangeText } from "@/lib/run/intake";
+import { generateOptions } from "@/lib/run/options";
 import { generateRisks } from "@/lib/run/risks";
 import { applySelectedProposal, revertToPreviousVersion } from "@/lib/run/apply";
 import { verifyOptions } from "@/lib/run/verify";
@@ -252,31 +253,43 @@ describe("RUN change intake", () => {
     expect(result.clarifyingQuestion).toBe("I couldn't read that update clearly. Which task changed, and what is the new time or amount?");
   });
 
-  it("does not report invalid AI-generated options as an invalid change request", async () => {
+  it("uses a verified deterministic schedule fallback when AI options remain invalid", async () => {
     const { z } = await import("zod");
     const eventId = "00000000-0000-4000-8000-000000000099";
+    const plan = makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]);
+    plan.constraints = { eventEndsAt: "2026-10-10T10:00:00.000Z" };
     mocks.consumeRateLimit.mockResolvedValue(true);
     mocks.rateLimitIdentity.mockReturnValue("test-client");
     mocks.loadOrganizerRun.mockResolvedValue({
       eventId,
       version: 1,
-      plan: makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]),
+      plan,
       answers: {},
       organizerToken: "test-token",
     });
-    mocks.sql.mockResolvedValue([]);
+    mocks.sql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "00000000-0000-4000-8000-000000000100" }]);
     mocks.llmJson
       .mockResolvedValueOnce({
         changes: [{ type: "DELAY", taskId: ids.caterer, minutes: 40, note: "Caterer is late" }],
         clarifyingQuestion: null,
       })
       .mockRejectedValueOnce(new z.ZodError([{
-        code: "invalid_type",
-        expected: "number",
-        received: "string",
-        path: ["options", 0, "rupeeImpact"],
-        message: "Expected number, received string",
-      }] as never));
+          code: "invalid_type",
+          expected: "number",
+          received: "string",
+          path: ["options", 0, "rupeeImpact"],
+          message: "Expected number, received string",
+        }] as never))
+      .mockRejectedValueOnce(new z.ZodError([{
+          code: "invalid_type",
+          expected: "number",
+          received: "string",
+          path: ["options", 0, "rupeeImpact"],
+          message: "Expected number, received string",
+        }] as never));
 
     const response = await intakePost(
       new Request(`https://eventmate.test/api/run/${eventId}/intake`, {
@@ -287,10 +300,64 @@ describe("RUN change intake", () => {
       { params: { eventId } },
     );
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      error: "I couldn't safely validate an adjustment for that update. Your input is still here—please retry.",
+      options: [{
+        source: "deterministic",
+        operations: [{ type: "shift", taskId: ids.caterer, minutes: -40 }],
+      }],
     });
+  });
+});
+
+describe("RUN option generation", () => {
+  beforeEach(() => {
+    mocks.llmJson.mockReset();
+  });
+
+  it("retries schema-invalid model options with the validation details", async () => {
+    const { z } = await import("zod");
+    const issue = new z.ZodError([{
+      code: "invalid_type",
+      expected: "number",
+      received: "string",
+      path: ["options", 0, "rupeeImpact"],
+      message: "Expected number, received string",
+    }] as never);
+    mocks.llmJson
+      .mockRejectedValueOnce(issue)
+      .mockResolvedValueOnce({
+        options: [
+          {
+            title: "Shift the catering schedule",
+            operations: [{ type: "shift", taskId: ids.caterer, minutes: -10 }],
+            tradeoffs: ["Setup starts earlier."],
+            rupeeImpact: 0,
+          },
+          {
+            title: "Shorten setup time",
+            operations: [{ type: "shorten", taskId: ids.caterer, minutes: 10 }],
+            tradeoffs: ["The team has less preparation time."],
+            rupeeImpact: 0,
+          },
+        ],
+      });
+
+    const plan = makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]);
+    const options = await generateOptions({
+      plan,
+      changes: [{ type: "DELAY", taskId: ids.caterer, minutes: 40 }],
+      impact: analyzeImpact(plan, []),
+      risks: [],
+      priorities: [],
+      constraints: [],
+    });
+
+    expect(options).toHaveLength(2);
+    expect(options[0].source).toBe("generated");
+    expect(mocks.llmJson).toHaveBeenCalledTimes(2);
+    expect(mocks.llmJson.mock.calls[0][0]).toContain('"minutes":15');
+    expect(mocks.llmJson.mock.calls[1][0]).toContain("options.0.rupeeImpact");
   });
 });
 

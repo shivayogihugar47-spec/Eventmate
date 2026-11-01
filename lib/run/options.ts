@@ -12,6 +12,27 @@ const OptionsSchema = z.object({
   })).min(2).max(3),
 });
 
+const optionsPrompt =
+  `You are an event operations option generator. Return exactly 2 or 3 ranked alternatives as ` +
+  `{"options":[{"title":"...","operations":[...],"tradeoffs":["..."],"rupeeImpact":0}]}. ` +
+  `Every option must have 1–12 operations and 1–5 tradeoffs. rupeeImpact must be a signed integer in INR. ` +
+  `Use only these exact operation shapes, with task IDs copied from the supplied plan: ` +
+  `shift={"type":"shift","taskId":"<uuid>","minutes":15}; ` +
+  `shorten={"type":"shorten","taskId":"<uuid>","minutes":10}; ` +
+  `parallelize={"type":"parallelize","taskId":"<uuid>","withTaskId":"<uuid>"}; ` +
+  `drop={"type":"drop","taskId":"<uuid>","reason":"..."}; ` +
+  `swap_vendor={"type":"swap_vendor","taskId":"<uuid>","vendorName":"...","costDelta":0}; ` +
+  `reassign={"type":"reassign","taskId":"<uuid>","owner":"..."}; ` +
+  `add_task={"type":"add_task","task":"...","startAt":"<ISO datetime>","durationMin":15,"owner":"...","dependsOn":[]} . ` +
+  `Do not add fields to these shapes. Never edit the plan directly. Respect dependencies, hard constraints, ` +
+  `the budget, and organizer priorities. Include plain-language tradeoffs.`;
+
+function validationIssues(error: z.ZodError): string {
+  return error.issues.map((issue) =>
+    `${issue.path.join(".") || "response"}: ${issue.message}`,
+  ).join("; ");
+}
+
 export async function generateOptions(input: {
   plan: RunPlan;
   changes: RunChange[];
@@ -33,15 +54,11 @@ export async function generateOptions(input: {
     }];
   }
 
-  const result = await llmJson(
-    `You are an event operations option generator. Return 2 or 3 ranked alternatives. ` +
-      `Only propose structured operations: shift, shorten, parallelize, drop, swap_vendor, reassign, add_task. ` +
-      `Never edit the event plan directly. Refer only to task IDs present in the plan. ` +
-      `Respect dependencies, hard constraints and the organizer's priorities. ` +
-      `rupeeImpact is the signed net INR change; use a negative amount for savings. ` +
-      `Include plain-language tradeoffs. ${input.retryReasons?.length ? `Previous options failed verification: ${input.retryReasons.join("; ")}. Correct these failures.` : ""}`,
-    [{
-      role: "user",
+  const retryContext = input.retryReasons?.length
+    ? ` Previous options failed verification: ${input.retryReasons.join("; ")}. Correct these failures.`
+    : "";
+  const messages = [{
+      role: "user" as const,
       content: JSON.stringify({
         plan: input.plan,
         changes: input.changes,
@@ -49,8 +66,19 @@ export async function generateOptions(input: {
         priorities: input.priorities,
         constraints: input.constraints,
       }),
-    }],
-    OptionsSchema,
-  );
+    }];
+  let result: z.infer<typeof OptionsSchema>;
+  try {
+    result = await llmJson(`${optionsPrompt}${retryContext}`, messages, OptionsSchema);
+  } catch (error) {
+    if (!(error instanceof z.ZodError)) throw error;
+    console.warn("[RUN options] Model output failed schema validation; retrying with validation details.", error.issues);
+    result = await llmJson(
+      `${optionsPrompt}${retryContext} The previous response failed validation: ${validationIssues(error)}. ` +
+        `Correct those exact issues. Return only the required JSON object.`,
+      messages,
+      OptionsSchema,
+    );
+  }
   return result.options.map((option) => ({ ...option, source: "generated" as const }));
 }

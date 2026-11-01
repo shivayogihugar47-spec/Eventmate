@@ -20,7 +20,17 @@ export function verifyOptions(
   const verified: VerifiedOption[] = [];
 
   for (const rawOption of options) {
-    const option = { ...rawOption, operations: rawOption.operations.map((op) => OperationSchema.parse(op)) };
+    const parsedOperations = rawOption.operations.map((operation) => OperationSchema.safeParse(operation));
+    const invalidOperation = parsedOperations.find((result) => !result.success);
+    if (invalidOperation && !invalidOperation.success) {
+      failures.push(`${rawOption.title}: contains an invalid operation (${invalidOperation.error.issues.map((issue) => issue.message).join("; ")}).`);
+      continue;
+    }
+    const option = {
+      ...rawOption,
+      operations: parsedOperations.map((result) => result.success ? result.data : null)
+        .filter((operation): operation is NonNullable<typeof operation> => operation !== null),
+    };
     if (!operationTargetsExist(changedPlan, option.operations)) {
       failures.push(`${option.title}: references a task outside the current plan.`);
       continue;
