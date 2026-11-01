@@ -437,7 +437,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
                 <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.17em] text-[#F2D591]">
                   <Activity size={12}/> Event-day command
                 </p>
-                <h1 className="mt-4 font-display text-2xl font-extrabold capitalize tracking-tight sm:text-4xl">{plan.eventType} operations</h1>
+                <h1 className="mt-4 font-display text-2xl font-extrabold capitalize tracking-tight text-white sm:text-4xl">{plan.eventType} operations</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#D2E0D7] sm:text-sm">
                   <span className="inline-flex items-center gap-1.5"><Clock size={13}/>{formatEventDate(plan.eventDate)}</span>
                   {plan.city && <span className="inline-flex items-center gap-1.5"><MapPin size={13}/>{plan.city}</span>}
@@ -458,7 +458,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
                 <Diya size={78} costume={costume} moodOverride={proposal?.impact.severity === "high" ? "worried" : busy ? "thinking" : completed === tasks.length && tasks.length > 0 ? "celebrate" : "greet"}/>
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#F2D591]">{active ? "Happening now" : eventIsToday && next ? "Coming up next" : overdue.length ? "Needs attention" : next ? "Runbook ready" : "Event wrap-up"}</p>
-                  <h2 className="mt-1 font-display text-xl font-extrabold leading-tight sm:text-2xl">
+                  <h2 className="mt-1 font-display text-xl font-extrabold leading-tight text-white sm:text-2xl">
                     {active?.task ?? (eventIsToday && next ? next.task : overdue.length ? "Your schedule has overdue tasks" : next ? "Your event day is coming" : "All scheduled moments are complete")}
                   </h2>
                   {(active ?? (eventIsToday ? next : undefined)) && <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#D5E2D9]">
