@@ -17,6 +17,7 @@ import { buildNextEventQuestion, getEventQuestionFlow, type EventCollectedData }
 import { formatINR } from "@/lib/budget";
 import { CommandCenter } from "@/components/diya/CommandCenter";
 import type { RunPlan } from "@/lib/run/types";
+import { VENDOR_CATEGORIES } from "@/lib/vendorCategories";
 
 // ── Dynamic imports (SSR safe) ────────────────────────────────────────────────
 const Diya    = dynamic(() => import("@/components/diya/Diya").then(m => m.Diya), { ssr: false });
@@ -400,22 +401,10 @@ interface LocalVendor {
   phone: string | null;
   website: string | null;
   mapUrl: string;
+  rating: number | null;
+  reviewCount: number | null;
+  openNow: boolean | null;
 }
-
-const VENDOR_CATEGORIES = [
-  {label:"All", search:"event vendors"},
-  {label:"Venues", search:"wedding and event venues"},
-  {label:"Caterers", search:"event caterers"},
-  {label:"Decorators & florists", search:"event decorators and wedding florists"},
-  {label:"Photographers", search:"event photographers"},
-  {label:"Entertainment", search:"event entertainment DJs and bands"},
-  {label:"Event planners", search:"event planners and wedding planners"},
-  {label:"Bakeries", search:"custom cake bakeries"},
-  {label:"Beauty & styling", search:"bridal makeup artists and hair stylists"},
-  {label:"Rentals & party supplies", search:"event furniture and party equipment rentals"},
-  {label:"Transport", search:"event transport and car rentals"},
-  {label:"Restaurants", search:"restaurants for private events"},
-] as const;
 
 function VendorsSection({ city: initialCity }:{ city:string }) {
   const [city, setCity] = useState(initialCity);
@@ -425,19 +414,19 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
   const [error, setError] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
 
-  const search = useCallback(async (query: string) => {
+  const search = useCallback(async (query: string, categoryId = "all") => {
     const trimmed = query.trim();
     if (!trimmed) return;
     setLoading(true);
     setError("");
     setVendors([]);
-    setActiveCategory("All");
+    setActiveCategory(categoryId);
     try {
-      const response = await fetch(`/api/vendors?city=${encodeURIComponent(trimmed)}`);
+      const response = await fetch(`/api/vendors?city=${encodeURIComponent(trimmed)}&category=${encodeURIComponent(categoryId)}`);
       const result = await response.json() as { error?:string; city?:string; results?:LocalVendor[] };
+      setSearchedCity(result.city ?? trimmed);
       if (!response.ok) throw new Error(result.error ?? "Unable to search local listings.");
       setVendors(result.results ?? []);
-      setSearchedCity(result.city ?? trimmed);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to search local listings. Please try again.");
     } finally {
@@ -450,11 +439,8 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
     void search(initialCity);
   }, [initialCity, search]);
 
-  const visibleVendors = activeCategory === "All"
-    ? vendors
-    : vendors.filter((vendor) => vendor.category === activeCategory);
   const searchUrl = (category: typeof VENDOR_CATEGORIES[number]) =>
-    `https://www.google.com/maps/search/${encodeURIComponent(`${category.search} in ${searchedCity}`)}`;
+    `https://www.google.com/maps/search/${encodeURIComponent(`${category.search} in ${searchedCity || city}`)}`;
 
   return (
     <div className="space-y-5">
@@ -491,15 +477,9 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
         </div>
         <div className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-[#6B756D]">
           <Store size={13} className="mt-0.5 shrink-0 text-[#A77D2B]"/>
-          <p>Real place listings within about 25 km of the city center, sourced from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="font-bold underline underline-offset-2">OpenStreetMap contributors</a>. Coverage varies; use the category-specific live searches below for more options and confirm services, availability, and pricing directly.</p>
+          <p>Searches Google Maps for real local places, ratings, and available contact details. Always confirm event services, availability, and pricing directly with the business.</p>
         </div>
       </div>
-
-      {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#F0C8BD] bg-[#FFF6F2] px-4 py-3 text-sm text-[#8F3D2B]">
-          <AlertCircle size={16} className="mt-0.5 shrink-0"/>{error}
-        </div>
-      )}
 
       {loading && (
         <div className="grid gap-3 sm:grid-cols-2" aria-label="Searching local vendors">
@@ -507,43 +487,54 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
         </div>
       )}
 
-      {!loading && !error && searchedCity && (
+      {!loading && searchedCity && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-display text-lg font-extrabold text-[#202B27]">Explore event vendors in {searchedCity}</h3>
-              <p className="mt-0.5 text-xs text-[#778078]">{vendors.length} mapped places · within around 25 km of the city center</p>
+              <h3 className="font-display text-lg font-extrabold text-[#202B27]">Event vendors in {searchedCity}</h3>
+              <p className="mt-0.5 text-xs text-[#778078]">{vendors.length} Google Maps results for {VENDOR_CATEGORIES.find((category) => category.id === activeCategory)?.label.toLowerCase() ?? "vendors"}</p>
             </div>
-            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#52645A] underline underline-offset-2">© OpenStreetMap contributors</a>
+            <span className="rounded-full bg-[#F1F4EF] px-3 py-1.5 text-[10px] font-extrabold text-[#52645A]">Places by Google Maps</span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {VENDOR_CATEGORIES.map((category) => {
-              const count = category.label === "All"
-                ? vendors.length
-                : vendors.filter((vendor) => vendor.category === category.label).length;
               return (
               <button
                 type="button"
                 key={category.label}
-                onClick={() => setActiveCategory(category.label)}
+                onClick={() => void search(city, category.id)}
+                disabled={loading}
                 className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
-                  activeCategory === category.label
+                  activeCategory === category.id
                     ? "bg-[#214E43] text-white"
                     : "border border-[#E5E0D3] bg-white text-[#52645A] hover:border-[#A77D2B]/50"
                 }`}
               >
-                {category.label} ({count})
+                {category.label}
               </button>
             );})}
           </div>
-          {visibleVendors.length > 0 ? (
+          {error ? (
+            <div role="alert" className="rounded-2xl border border-[#E8DFC5] bg-[#FBF8EE] px-5 py-5 text-sm text-[#6E6652]">
+              <div className="flex items-start gap-2"><AlertCircle size={16} className="mt-0.5 shrink-0 text-[#A77D2B]"/><p>{error}</p></div>
+              <a href={searchUrl(VENDOR_CATEGORIES.find((category) => category.id === activeCategory) ?? VENDOR_CATEGORIES[0])}
+                target="_blank" rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#214E43] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#173D34]">
+                Open this search in Google Maps <ExternalLink size={13}/>
+              </a>
+            </div>
+          ) : vendors.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              {visibleVendors.map((vendor, index) => {
-              const I = vendor.category.toLowerCase().includes("florist") || vendor.category.includes("Decorator") ? Flower2
-                : vendor.category === "Photographers" ? Camera
-                : vendor.category === "Bakeries" ? Cake
-                : vendor.category === "Entertainment" ? Music
-                : vendor.category === "Restaurants" || vendor.category === "Caterers" ? Utensils
+              {vendors.map((vendor, index) => {
+              const normalizedCategory = vendor.category.toLowerCase();
+              const I = normalizedCategory.includes("flor") || normalizedCategory.includes("decor") ? Flower2
+                : normalizedCategory.includes("photo") ? Camera
+                : normalizedCategory.includes("baker") || normalizedCategory.includes("cake") ? Cake
+                : normalizedCategory.includes("music") || normalizedCategory.includes("entertain") || normalizedCategory.includes("dj") ? Music
+                : normalizedCategory.includes("cater") || normalizedCategory.includes("restaurant") ? Utensils
+                : normalizedCategory.includes("makeup") || normalizedCategory.includes("beauty") ? Heart
+                : normalizedCategory.includes("rental") || normalizedCategory.includes("transport") ? Car
+                : normalizedCategory.includes("planner") ? CheckCircle2
                 : Building2;
               const palette = PAL[index % PAL.length];
               return (
@@ -562,6 +553,21 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
                       <span className="inline-flex rounded-full bg-[#EDF2ED] px-2 py-1 text-[10px] font-bold text-[#315C4C]">{vendor.category}</span>
                       <h4 className="mt-2 font-display text-sm font-extrabold leading-snug text-[#202B27]">{vendor.name}</h4>
                       {vendor.address && <p className="mt-1 text-xs leading-relaxed text-[#788179]">{vendor.address}</p>}
+                      {(vendor.rating !== null || vendor.openNow !== null) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {vendor.rating !== null && (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-[#34483F]" aria-label={`${vendor.rating} out of 5 stars`}>
+                              <span className="text-[#E9A928]">★</span>{vendor.rating.toFixed(1)}
+                              {vendor.reviewCount !== null && <span className="font-medium text-[#899189]">({vendor.reviewCount.toLocaleString("en-IN")} reviews)</span>}
+                            </span>
+                          )}
+                          {vendor.openNow !== null && (
+                            <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${vendor.openNow ? "bg-[#EAF4EA] text-[#27734A]" : "bg-[#F1F1EE] text-[#777E78]"}`}>
+                              {vendor.openNow ? "Open now" : "Closed now"}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-[#F0EEE8] pt-3">
@@ -586,30 +592,28 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
           ) : (
             <div className="rounded-2xl border border-[#E8E6DE] bg-[#FAFAF6] px-5 py-7 text-center">
               <Store size={23} className="mx-auto text-[#A77D2B]"/>
-              <h4 className="mt-2 font-display font-extrabold text-[#202B27]">
-                {activeCategory === "All" ? "No mapped vendors found nearby" : `No mapped ${activeCategory.toLowerCase()} found nearby`}
-              </h4>
+              <h4 className="mt-2 font-display font-extrabold text-[#202B27]">No Google Maps results for this search</h4>
               <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-[#778078]">
-                OpenStreetMap may not have this type of business mapped in {searchedCity}. Search local listings to see more options.
+                Try another vendor category or open this search directly in Google Maps.
               </p>
               <a
-                href={searchUrl(VENDOR_CATEGORIES.find((category) => category.label === activeCategory) ?? VENDOR_CATEGORIES[0])}
+                href={searchUrl(VENDOR_CATEGORIES.find((category) => category.id === activeCategory) ?? VENDOR_CATEGORIES[0])}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#214E43] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#173D34]"
               >
-                Search {activeCategory === "All" ? "event vendors" : activeCategory.toLowerCase()} in {searchedCity} <ExternalLink size={13}/>
+                Search {VENDOR_CATEGORIES.find((category) => category.id === activeCategory)?.label.toLowerCase() ?? "vendors"} in {searchedCity} <ExternalLink size={13}/>
               </a>
             </div>
           )}
           <div>
             <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#7D877F]">More vendor categories</p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {VENDOR_CATEGORIES.filter((category) => category.label !== "All").map((category) => (
-                <a key={category.label} href={searchUrl(category)} target="_blank" rel="noreferrer"
-                  className="flex items-center justify-between gap-2 rounded-xl border border-[#E7E4DB] bg-white px-3 py-2.5 text-xs font-bold text-[#42564A] transition hover:border-[#B9C9BD] hover:bg-[#F7F9F5]">
-                  <span>{category.label}</span><ExternalLink size={13} className="shrink-0 text-[#A77D2B]"/>
-                </a>
+              {VENDOR_CATEGORIES.filter((category) => category.id !== "all").map((category) => (
+                <button key={category.id} type="button" onClick={() => void search(city, category.id)} disabled={loading}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-[#E7E4DB] bg-white px-3 py-2.5 text-left text-xs font-bold text-[#42564A] transition hover:border-[#B9C9BD] hover:bg-[#F7F9F5] disabled:opacity-50">
+                  <span>{category.label}</span><Search size={13} className="shrink-0 text-[#A77D2B]"/>
+                </button>
               ))}
             </div>
           </div>
