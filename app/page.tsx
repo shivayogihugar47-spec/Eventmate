@@ -1152,6 +1152,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
   const [isRetrying, setIsRetrying] = useState(false);
   const [readyToGen, setReadyToGen]     = useState(false);
   const [generationError, setGenerationError] = useState("");
+  const [questionFallbackNotice, setQuestionFallbackNotice] = useState("");
   const [plan, setPlan]                 = useState<EventPlan|null>(null);
   const [runSession, setRunSession] = useState<{eventId:string;organizerToken:string;plan:RunPlan}|null>(null);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
@@ -1205,11 +1206,13 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
         const res = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:msgs})});
         if (!res.ok) throw new Error("Unable to load the next planning question.");
         const data = await res.json() as {card:AssistantCard;readyToGenerate:boolean;collectedData:EventCollectedData};
+        setQuestionFallbackNotice("");
         setCurrentCard(data.card);
         if (data.collectedData) setCollected(data.collectedData);
         if (data.readyToGenerate) setReadyToGen(true);
       } catch {
         const fallback = buildNextEventQuestion(msgs);
+        setQuestionFallbackNotice("The question service is unavailable. The built-in questions are continuing, and your answers are preserved.");
         setCurrentCard(fallback.card ?? null);
         setCollected(fallback.collectedData);
         setReadyToGen(fallback.readyToGenerate);
@@ -1234,12 +1237,14 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
     const newHistory = [...history,{role:"user",content:display}];
     setHistory(newHistory);
     setIsLoading(true);
+    setQuestionFallbackNotice("");
     setCurrentCard(null);
 
     try {
       const res = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:newHistory})});
       if (!res.ok) throw new Error("Unable to load the next planning question.");
       const data = await res.json() as {card?:AssistantCard;readyToGenerate:boolean;collectedData:EventCollectedData};
+      setQuestionFallbackNotice("");
       if (data.collectedData) setCollected(data.collectedData);
       if (data.readyToGenerate) {
         setReadyToGen(true);
@@ -1249,6 +1254,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
       }
     } catch {
       const fallback = buildNextEventQuestion(newHistory);
+      setQuestionFallbackNotice("The question service is unavailable. The built-in questions are continuing, and your answers are preserved.");
       setCollected(fallback.collectedData);
       setReadyToGen(fallback.readyToGenerate);
       setCurrentCard(fallback.card ?? null);
@@ -1401,6 +1407,11 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
           )}
 
           <div className="w-full max-w-lg" aria-live="polite" aria-busy={isLoading || isGenerating}>
+            {questionFallbackNotice && (
+              <p role="status" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                {questionFallbackNotice}
+              </p>
+            )}
             <AnimatePresence mode="wait">
               {isLoading&&!currentCard&&(
                 <motion.div key="loading" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}

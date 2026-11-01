@@ -241,6 +241,9 @@ export async function POST(request: Request) {
     if (err instanceof z.ZodError || err instanceof SyntaxError) {
       return NextResponse.json({ error: "The planning request is invalid or too long." }, { status: 400 });
     }
-    return NextResponse.json(buildNextEventQuestion(messages));
+    return NextResponse.json(
+      { error: "Unable to continue the event questions. Please try again." },
+      { status: 500 },
+    );
   }
 }
