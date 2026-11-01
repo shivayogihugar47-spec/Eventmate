@@ -865,12 +865,12 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
 
           <motion.h1 initial={{opacity:0,y:24}} animate={{opacity:1,y:0}} transition={{delay:0.07}}
             className="font-extrabold font-display leading-[1.04] mb-4 text-[#202B27] text-4xl sm:text-5xl lg:text-7xl">
-            Make room for<br className="hidden sm:block"/><span className="text-[#D9684E]">something wonderful.</span>
+            Plan the details.<br className="hidden sm:block"/><span className="text-[#D9684E]">Be there for the moment.</span>
           </motion.h1>
 
           <motion.p initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.12}}
             className="text-[#58645E] text-base sm:text-lg leading-relaxed mb-5 max-w-lg mx-auto lg:mx-0">
-            Tell <strong className="text-[#202B27]">Eve</strong> what you&apos;re celebrating. Get a thoughtful plan for the timeline, budget, vendors, and all the details.
+            Tell <strong className="text-[#202B27]">Eve</strong> what you&apos;re celebrating. Get a clear plan for your timeline, budget, vendors, and all the details—then save it to your account and come back whenever you need.
           </motion.p>
 
           {/* Planning actions */}
@@ -887,7 +887,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
                   <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#F6C65B] text-[#214E43]"><Wand2 size={18}/></span>
                   <span className="min-w-0">
                     <span className="block text-sm font-extrabold">Build my event plan</span>
-                    <span className="mt-0.5 block text-[11px] font-medium text-white/75">A tailored track for your kind of event.</span>
+                    <span className="mt-0.5 block text-[11px] font-medium text-white/75">A thoughtful plan, saved to your account.</span>
                   </span>
                 </span>
                 <ArrowRight size={18} className="flex-shrink-0 text-[#F6C65B] transition-transform group-hover:translate-x-1"/>
@@ -907,7 +907,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
             {[
               {n:"10",    l:"tailored questions", c:"#315C4C", s:"#CBD5CC"},
               {n:"< 2 min",l:"to your plan",    c:"#D9684E", s:"#F1C5B9"},
-              {n:"Free",  l:"no signup",       c:"#B27A18", s:"#EED9A7"},
+              {n:"Saved", l:"to your account", c:"#B27A18", s:"#EED9A7"},
             ].map(({n,l,c,s},i)=>(
               <motion.div key={i} initial={{scale:0.8,opacity:0}} animate={{scale:1,opacity:1}}
                 transition={{delay:0.25+i*0.06,type:"spring",stiffness:300,damping:18}}
@@ -1114,7 +1114,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
             <motion.button onClick={()=>onStart()}
               whileHover={{y:-3,scale:1.02}} whileTap={{y:1,scale:0.98}}
               className="inline-flex items-center gap-3 px-7 py-4 rounded-xl bg-[#F6C65B] text-[#202B27] font-extrabold text-base hover:bg-[#FFDA82] transition-colors">
-              <Wand2 size={18}/> Start Planning — It&apos;s Free
+              <Wand2 size={18}/> Build my event plan
             </motion.button>
           </div>
         </motion.div>
