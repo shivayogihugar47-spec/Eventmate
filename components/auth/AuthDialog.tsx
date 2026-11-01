@@ -91,7 +91,7 @@ export function AuthDialog({ onClose, onAuthenticated }: Props) {
         </form>
 
         <p className="mt-5 text-center text-xs text-[#68736D]">
-          {mode === "sign-up" ? "Already have an account?" : "New to EventMate?"}{" "}
+          {mode === "sign-up" ? "Already have an account?" : "New to Jashn?"}{" "}
           <button type="button" onClick={() => { setMode(mode === "sign-up" ? "sign-in" : "sign-up"); setError(""); }} className="font-extrabold text-[#315C4C] underline-offset-2 hover:underline">
             {mode === "sign-up" ? "Sign in" : "Create an account"}
           </button>

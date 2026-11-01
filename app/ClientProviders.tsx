@@ -45,7 +45,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
 
   // Greet once on first load.
   useEffect(() => {
-    const t = setTimeout(() => say("Hi! I'm Diya — let's plan something magical ✨", "greet", 4000), 1200);
+    const t = setTimeout(() => say("Hi, I'm Diya, your Jashn planner.", "greet", 4000), 1200);
     return () => clearTimeout(t);
   }, [say]);
 

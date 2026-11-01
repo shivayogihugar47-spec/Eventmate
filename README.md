@@ -1,6 +1,8 @@
-# EventMate Live
+# Jashn
 
-EventMate Live helps people turn an event idea into a practical plan. Answer a short set of questions about the event, guests, location, budget, accessibility, and age mix; review a generated plan; then use its timeline, budget, vendor-search links, and checklist to organize the day.
+**Plans your celebration. Runs it too.**
+
+Jashn helps people turn an event idea into a practical plan. Answer a short set of questions about the event, guests, location, budget, accessibility, and age mix; review a generated plan; then use its timeline, budget, vendor-search links, and checklist to organize the day.
 
 It is for people planning weddings, birthdays, community gatherings, corporate events, festivals, and other celebrations—especially organizers who want a structured starting point without needing event-planning expertise.
 
@@ -8,7 +10,7 @@ It is for people planning weddings, birthdays, community gatherings, corporate e
 
 - Guides visitors through the ASK flow before asking them to sign in.
 - Generates a tailored PLAN with a timeline, budget, checklist, and vendor categories.
-- Uses the city and selected category to open external vendor-search links. EventMate does not scrape, verify, or claim availability for those listings.
+- Uses the city and selected category to open external vendor-search links. Jashn does not scrape, verify, or claim availability for those listings.
 - Provides a RUN Command Center for approved schedule changes, owner task links, and event wrap-up.
 - Lets signed-in users save and reopen plans. Visitors can try the planner without an account; account-linked saved events require Neon Auth configuration.
 - Uses Diya as an optional mascot. Its images load on demand, and reduced-motion preferences are respected.
@@ -100,6 +102,10 @@ Optional local/integration variables:
 | `NEON_FUNCTION_HELLO_BASE_URL` | Optional URL for the Neon hello Function client. |
 
 `.env.example` lists the application's environment variables with **no values**. `.env.local` is covered by `.gitignore`.
+
+### Brand assets
+
+Place `jashn-logo.png` and `jashn-icon.png` in `public/brand/`. The logo is used in the navigation and landing hero; the icon is used for browser and Apple touch icons.
 
 ### Vercel deployment
 

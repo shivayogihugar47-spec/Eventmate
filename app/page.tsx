@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import {
   Sparkles, Calendar, Users, MapPin, IndianRupee, Clock,
   CheckCircle2, Camera, Music, Utensils, Flower2, Car,
@@ -501,7 +502,7 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
               </a>
             ))}
             </div>
-          <p className="text-[11px] leading-relaxed text-[#66736A]">Search links open external websites. EventMate does not fetch or verify their listings; confirm vendor details directly.</p>
+          <p className="text-[11px] leading-relaxed text-[#66736A]">Search links open external websites. Jashn does not fetch or verify their listings; confirm vendor details directly.</p>
         </>
       )}
     </div>
@@ -583,7 +584,7 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
               <Sparkles size={16}/>
             </span>
             <div>
-              <p className="font-display text-sm font-extrabold text-[#214E43]">EventMate<span className="text-[#D9684E]">.</span></p>
+              <p className="font-display text-sm font-extrabold text-[#214E43]">Jashn</p>
               <p className="text-[10px] font-medium text-[#7D877F]">Your event workspace</p>
             </div>
           </div>
@@ -811,7 +812,14 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
               <Sparkles size={17} className="text-[#F6C65B]"/>
             </div>
           </div>
-          <span className="font-extrabold text-[#202B27] text-xl font-display">EventMate<span className="text-[#E66C50]">.</span></span>
+          <Image
+            src="/brand/jashn-logo.png"
+            alt="Jashn — Plans your celebration. Runs it too."
+            width={560}
+            height={180}
+            priority
+            className="h-10 w-auto object-contain sm:h-12"
+          />
         </div>
         <div className="hidden items-center gap-7 md:flex">
           <a href="#event-types" className="text-xs font-bold text-[#68736D] transition-colors hover:text-[#214E43]">Choose an event</a>
@@ -871,6 +879,14 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
 
         {/* Left text */}
         <div className="text-center lg:text-left">
+          <Image
+            src="/brand/jashn-logo.png"
+            alt="Jashn — Plans your celebration. Runs it too."
+            width={560}
+            height={180}
+            priority
+            className="mx-auto mb-5 h-16 w-auto max-w-full object-contain lg:mx-0 sm:h-20"
+          />
           {/* Clay badge */}
           <motion.div initial={{opacity:0,y:-12,scale:0.9}} animate={{opacity:1,y:0,scale:1}}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4 text-[11px] font-bold uppercase tracking-wider bg-[#E8EEE7] text-[#315C4C]">
@@ -1310,7 +1326,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#173F35] shadow-[0_2px_6px_rgba(23,63,53,0.18)]">
             <Sparkles size={15} className="text-[#F0D38C]"/>
           </div>
-          <span className="font-display font-extrabold text-[#173F35]">EventMate<span className="text-[#A77D2B]">.</span></span>
+          <span className="font-display font-extrabold text-[#173F35]">Jashn</span>
         </div>
 
         {/* Progress bar */}
