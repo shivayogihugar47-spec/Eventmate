@@ -90,7 +90,11 @@ export async function saveLockedRun(
       })))}::jsonb) AS risk(title text, trigger_type text, likelihood text, backup_action jsonb)`,
     sql`INSERT INTO owner_links (token, event_id, task_ids, expires_at)
       SELECT link.token, ${eventId}, ARRAY(SELECT value::uuid FROM jsonb_array_elements_text(link.task_ids)), link.expires_at
-      FROM jsonb_to_recordset(${JSON.stringify(ownerLinks)}::jsonb) AS link(token text, task_ids jsonb, expires_at timestamptz)`,
+      FROM jsonb_to_recordset(${JSON.stringify(ownerLinks.map(({ token, taskIds, expiresAt }) => ({
+        token,
+        task_ids: taskIds,
+        expires_at: expiresAt,
+      })))}::jsonb) AS link(token text, task_ids jsonb, expires_at timestamptz)`,
     sql`INSERT INTO plan_events (event_id, type, payload, actor)
       VALUES (${eventId}, 'LOCKED', ${JSON.stringify({ version: 1, eventType: plan.eventType })}, 'organizer')`,
   ]);
