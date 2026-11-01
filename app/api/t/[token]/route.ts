@@ -9,6 +9,7 @@ import { ChangeSchema, type PlanRisk } from "@/lib/run/types";
 import { consumeRateLimit, loadOwnerRun } from "@/lib/run/security";
 import { draftOwnerNotifications } from "@/lib/run/notify";
 import { createHash } from "node:crypto";
+import { parseJsonBody } from "@/lib/apiRequest";
 
 type RouteContext = { params: Promise<{ token: string }> };
 
@@ -28,6 +29,9 @@ function tokenBucket(token: string): string {
 export async function GET(_request: Request, context: RouteContext) {
   const { token } = await context.params;
   try {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
+      return NextResponse.json({ error: "This owner link is invalid or has expired." }, { status: 404 });
+    }
     if (!await consumeRateLimit(`owner:${tokenBucket(token)}:poll`, 40)) {
       return NextResponse.json({ error: "Too many refreshes. Try again shortly." }, { status: 429 });
     }
@@ -51,11 +55,16 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   const { token } = await context.params;
   try {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
+      return NextResponse.json({ error: "This owner link is invalid or has expired." }, { status: 404 });
+    }
     if (!await consumeRateLimit(`owner:${tokenBucket(token)}:action`, 12)) {
       return NextResponse.json({ error: "Too many task updates. Try again shortly." }, { status: 429 });
     }
     const owner = await loadOwnerRun(token);
-    const body = OwnerActionSchema.parse(await request.json());
+    const parsedBody = await parseJsonBody(request, OwnerActionSchema, 4 * 1024);
+    if (!parsedBody.success) return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
+    const body = parsedBody.data;
     if (!owner.taskIds.includes(body.taskId)) throw new RunApiError("This task is not assigned to this owner link.", 403);
     if (owner.version !== body.version) {
       return NextResponse.json({ error: "The schedule changed. Refresh before updating this task.", stale: true }, { status: 409 });

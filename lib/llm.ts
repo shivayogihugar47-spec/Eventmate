@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // OpenRouter client (OpenAI-compatible) – lazy singleton
@@ -47,6 +48,44 @@ function stripCodeFences(raw: string): string {
     .trim();
 }
 
+const responseCache = new Map<string, { expiresAt: number; value: unknown }>();
+const inFlightRequests = new Map<string, Promise<unknown>>();
+const schemaIds = new WeakMap<object, number>();
+let nextSchemaId = 0;
+
+function getSchemaId(schema: object): number {
+  let id = schemaIds.get(schema);
+  if (id === undefined) {
+    id = ++nextSchemaId;
+    schemaIds.set(schema, id);
+  }
+  return id;
+}
+
+function isRateLimitError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "status" in error && error.status === 429;
+}
+
+function retryDelay(error: unknown): number {
+  const headers = typeof error === "object" && error !== null && "headers" in error
+    ? error.headers
+    : undefined;
+  const retryAfter = headers instanceof Headers
+    ? headers.get("retry-after")
+    : typeof headers === "object" && headers !== null && "retry-after" in headers &&
+      typeof headers["retry-after"] === "string"
+      ? headers["retry-after"]
+      : undefined;
+  const seconds = Number(retryAfter);
+  return Number.isFinite(seconds) && seconds > 0
+    ? Math.min(seconds * 1000, 1500)
+    : 400;
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 // ---------------------------------------------------------------------------
 // llmJson
 // ---------------------------------------------------------------------------
@@ -66,9 +105,22 @@ export async function llmJson<T>(
   schema: z.ZodType<T>,
   options: { maxTokens?: number } = {},
 ): Promise<T> {
-  const model = process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free";
+  const model = process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct";
   const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL ?? "openai/gpt-4o-mini";
   const client = getOpenRouterClient();
+  const key = createHash("sha256").update(JSON.stringify({
+    system,
+    messages,
+    model,
+    fallbackModel,
+    maxTokens: options.maxTokens,
+    schemaId: getSchemaId(schema),
+  })).digest("hex");
+  const cached = responseCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return schema.parse(cached.value);
+  if (cached) responseCache.delete(key);
+  const pending = inFlightRequests.get(key);
+  if (pending) return schema.parse(await pending);
 
   const systemMessage: ChatMessage = {
     role: "system",
@@ -89,15 +141,34 @@ export async function llmJson<T>(
     return schema.parse(parsed);
   }
 
-  try {
-    return await attempt(model);
-  } catch (firstError) {
-    console.warn(`[llmJson] First attempt failed with ${model}, retrying with fallback ${fallbackModel}...`, firstError);
+  const request = async () => {
     try {
-      return await attempt(fallbackModel);
-    } catch (secondError) {
-      console.error("[llmJson] Both attempts failed.", { firstError, secondError });
-      throw secondError;
+      return await attempt(model);
+    } catch (firstError) {
+      console.warn(`[llmJson] First attempt failed with ${model}, retrying with fallback ${fallbackModel}.`);
+      if (isRateLimitError(firstError)) await wait(retryDelay(firstError));
+      try {
+        return await attempt(fallbackModel);
+      } catch (secondError) {
+        console.error("[llmJson] Both model attempts failed.");
+        throw secondError;
+      }
     }
+  };
+  const pendingRequest = request();
+  inFlightRequests.set(key, pendingRequest);
+  try {
+    const result = await pendingRequest;
+    responseCache.set(key, { value: result, expiresAt: Date.now() + 15_000 });
+    if (responseCache.size > 200) {
+      const now = Date.now();
+      for (const [cacheKey, entry] of responseCache) {
+        if (entry.expiresAt <= now || responseCache.size > 200) responseCache.delete(cacheKey);
+        if (responseCache.size <= 150) break;
+      }
+    }
+    return result;
+  } finally {
+    inFlightRequests.delete(key);
   }
 }

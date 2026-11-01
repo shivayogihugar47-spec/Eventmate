@@ -8,6 +8,7 @@ import { verifyOptions, deterministicShiftOption } from "@/lib/run/verify";
 import { consumeRateLimit, loadOwnedOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
 import type { PlanRisk, RunChange, RunOption } from "@/lib/run/types";
 import { commitPlanVersion, RunApiError } from "@/lib/run/apply";
+import { isUuid, parseJsonBody } from "@/lib/apiRequest";
 
 const RequestSchema = z.object({
   version: z.number().int().positive(),
@@ -23,20 +24,10 @@ type RouteContext = { params: Promise<{ eventId: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return NextResponse.json({ error: "The change request body is not valid JSON." }, { status: 400 });
-    }
-    console.error("[/api/run intake] Unable to read request body.", error);
-    return NextResponse.json({ error: "I couldn't read that change request. Your input is still here—please retry." }, { status: 503 });
-  }
-
-  const parsedBody = RequestSchema.safeParse(rawBody);
+  if (!isUuid(eventId)) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  const parsedBody = await parseJsonBody(request, RequestSchema, 8 * 1024);
   if (!parsedBody.success) {
-    return NextResponse.json({ error: "The change request is invalid. Check the fields and try again." }, { status: 400 });
+    return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
   }
 
   const body = parsedBody.data;

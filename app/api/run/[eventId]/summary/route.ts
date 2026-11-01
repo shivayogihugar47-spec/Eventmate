@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { llmJson } from "@/lib/llm";
 import { consumeRateLimit, loadOwnedOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
 import { RunApiError } from "@/lib/run/apply";
+import { isUuid, parseJsonBody } from "@/lib/apiRequest";
 
 const LessonsSchema = z.object({
   lessons: z.array(z.string().min(4).max(240)).min(2).max(5),
@@ -51,6 +52,7 @@ async function buildSummary(eventId: string, request: Request) {
 
 export async function GET(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
+  if (!isUuid(eventId)) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   try {
     if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:summary`, 6)) {
       return NextResponse.json({ error: "Too many summary requests. Try again shortly." }, { status: 429 });
@@ -65,8 +67,11 @@ export async function GET(request: Request, context: RouteContext) {
 
 export async function POST(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
+  if (!isUuid(eventId)) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   try {
-    const body = TemplateSchema.parse(await request.json());
+    const parsedBody = await parseJsonBody(request, TemplateSchema, 2 * 1024);
+    if (!parsedBody.success) return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
+    const body = parsedBody.data;
     if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:template`, 3)) {
       return NextResponse.json({ error: "Too many template requests. Try again shortly." }, { status: 429 });
     }

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { loadOwnedOrganizerRun, consumeRateLimit, rateLimitIdentity } from "@/lib/run/security";
+import { isUuid } from "@/lib/apiRequest";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
+  if (!isUuid(eventId)) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   try {
     const run = await loadOwnedOrganizerRun(request, eventId);
     if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:poll`, 40)) {

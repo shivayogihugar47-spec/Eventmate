@@ -22,6 +22,6 @@ export const authConfig = {
 
   /** Whether auth env vars are present and non-empty. */
   get isConfigured(): boolean {
-    return Boolean(this.baseUrl && this.jwksUrl);
+    return Boolean(this.baseUrl && this.jwksUrl && process.env.NEON_AUTH_COOKIE_SECRET && process.env.NEON_AUTH_COOKIE_SECRET.length >= 32);
   },
 } as const;

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { llmJson } from "@/lib/llm";
+import { consumeRateLimit, publicRateLimitIdentity } from "@/lib/run/security";
+import { parseJsonBody } from "@/lib/apiRequest";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,12 @@ const CommentSchema = z.object({ comment: z.string().trim().min(1).max(240) });
 
 export async function POST(req: Request) {
   try {
-    const { step, answer, eventType, city } = RequestSchema.parse(await req.json());
+    const body = await parseJsonBody(req, RequestSchema, 4 * 1024);
+    if (!body.success) return NextResponse.json({ error: body.error }, { status: body.status });
+    const { step, answer, eventType, city } = body.data;
+    if (!await consumeRateLimit(`llm:comment:${publicRateLimitIdentity(req)}`, 20)) {
+      return NextResponse.json({ error: "Eve is busy. Please wait a minute and try again." }, { status: 429 });
+    }
 
     const context = [
       eventType ? `event: ${eventType}` : "",
@@ -47,7 +54,7 @@ Return one reaction sentence in the comment JSON field.`,
     return NextResponse.json(result);
   } catch (error) {
     console.error("[/api/comment]", error);
-    if (error instanceof z.ZodError) {
+    if (error instanceof z.ZodError || error instanceof SyntaxError) {
       return NextResponse.json({ error: "The comment request is invalid." }, { status: 400 });
     }
     return NextResponse.json({ error: "Eve could not prepare a comment right now." }, { status: 503 });

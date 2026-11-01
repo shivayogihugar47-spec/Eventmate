@@ -4,6 +4,8 @@ import { sql } from "@/lib/db";
 import { applyProposal, RunApiError } from "@/lib/run/apply";
 import { draftOwnerNotifications } from "@/lib/run/notify";
 import { consumeRateLimit, rateLimitIdentity } from "@/lib/run/security";
+import { parseJsonBody } from "@/lib/apiRequest";
+import { isUuid } from "@/lib/apiRequest";
 
 const ApplySchema = z.object({
   proposalId: z.string().uuid(),
@@ -16,8 +18,11 @@ type RouteContext = { params: Promise<{ eventId: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
+  if (!isUuid(eventId)) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   try {
-    const body = ApplySchema.parse(await request.json());
+    const parsedBody = await parseJsonBody(request, ApplySchema, 4 * 1024);
+    if (!parsedBody.success) return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
+    const body = parsedBody.data;
     if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:apply`, 10)) {
       return NextResponse.json({ error: "Too many apply attempts. Try again shortly." }, { status: 429 });
     }

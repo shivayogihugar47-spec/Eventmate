@@ -5,6 +5,8 @@ import { RunApiError } from "@/lib/run/apply";
 import { draftOwnerNotifications } from "@/lib/run/notify";
 import { consumeRateLimit, loadOwnedOrganizerRun, rateLimitIdentity } from "@/lib/run/security";
 import { ChangeSchema } from "@/lib/run/types";
+import { parseJsonBody } from "@/lib/apiRequest";
+import { isUuid } from "@/lib/apiRequest";
 
 const NotifySchema = z.object({
   version: z.number().int().positive(),
@@ -16,8 +18,11 @@ type RouteContext = { params: Promise<{ eventId: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
+  if (!isUuid(eventId)) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   try {
-    const body = NotifySchema.parse(await request.json());
+    const parsedBody = await parseJsonBody(request, NotifySchema, 8 * 1024);
+    if (!parsedBody.success) return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
+    const body = parsedBody.data;
     if (!await consumeRateLimit(`${eventId}:${rateLimitIdentity(request)}:notify`, 8)) {
       return NextResponse.json({ error: "Too many notification retries. Try again shortly." }, { status: 429 });
     }
