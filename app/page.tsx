@@ -936,6 +936,7 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
   const [isLoading, setIsLoading]       = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [readyToGen, setReadyToGen]     = useState(false);
+  const [generationError, setGenerationError] = useState("");
   const [plan, setPlan]                 = useState<EventPlan|null>(null);
   const [runSession, setRunSession] = useState<{eventId:string;organizerToken:string;plan:RunPlan}|null>(null);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
@@ -1033,19 +1034,26 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
   const handleGenerate = useCallback(async () => {
     if (!readyToGen||isGenerating) return;
     setIsGenerating(true);
+    setGenerationError("");
     say("Building your professional event plan… this is going to be amazing!", "thinking", 15000);
     try {
       const res = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({messages:history,generatePlan:true,planData:collectedData})});
-      if (!res.ok) throw new Error("Unable to generate the plan.");
-      const data = await res.json() as {
-        plan:RunPlan;
-        run:{eventId:string;organizerToken:string;version:number;ownerLinks:{owner:string;token:string;taskIds:string[];expiresAt:string}[]};
+      const payload = await res.json().catch(() => ({})) as {
+        error?:string;
+        plan?:RunPlan;
+        run?:{eventId:string;organizerToken:string;version:number;ownerLinks:{owner:string;token:string;taskIds:string[];expiresAt:string}[]};
       };
-      setPlan(data.plan);
-      setRunSession({eventId:data.run.eventId,organizerToken:data.run.organizerToken,plan:data.plan});
-    } catch {
-      say("Something went wrong generating the plan. Please try again.", "worried", 4000);
+      if (!res.ok) throw new Error(payload.error ?? "Unable to generate the plan.");
+      if (!payload.plan || !payload.run?.eventId || !payload.run.organizerToken) {
+        throw new Error("The server returned an incomplete plan. Your answers are saved; please retry.");
+      }
+      setPlan(payload.plan);
+      setRunSession({eventId:payload.run.eventId,organizerToken:payload.run.organizerToken,plan:payload.plan});
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Something went wrong generating the plan. Please try again.";
+      setGenerationError(message);
+      say(message, "worried", 5000);
     } finally { setIsGenerating(false); }
   },[readyToGen,isGenerating,history,collectedData,say]);
 
@@ -1228,6 +1236,7 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
                     <p className="text-2xl font-extrabold text-[#111827] font-display">All set!</p>
                     <p className="text-sm text-[#9CA3AF] mt-1">I have everything I need.</p>
                   </div>
+                  {generationError&&<p role="alert" className="max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-800">{generationError} Your answers are still here—retry when ready.</p>}
                   <motion.button onClick={handleGenerate}
                     whileHover={{scale:1.04,boxShadow:`0 12px 32px ${activeColor}40`}} whileTap={{scale:0.96}}
                     className="flex items-center gap-3 px-8 py-4 rounded-2xl text-white font-bold text-base"

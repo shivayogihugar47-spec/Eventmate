@@ -137,6 +137,7 @@ Requirements:
 export async function POST(request: Request) {
   let messages: EventChatMessage[] = [];
   let generatingPlan = false;
+  let failureStage = "request processing";
   try {
     const body = await request.json() as {
       messages: EventChatMessage[];
@@ -148,15 +149,19 @@ export async function POST(request: Request) {
 
     // ── Plan generation mode ────────────────────────────────────────────────
     if (generatingPlan && body.planData) {
+      failureStage = "AI plan generation";
       const plan = await llmJson(
         "You are a professional event planner. Return a detailed plan that matches the exact JSON structure requested by the user.",
         [{ role: "user", content: buildPlanPrompt(body.planData) }],
         GeneratedPlanSchema,
+        { maxTokens: 6000 },
       );
       plan.budgetTotal = parseBudget(body.planData.budgetTotal ?? "");
       plan.budgetBreakdown = normalizeBudgetAmounts(plan.budgetBreakdown, plan.budgetTotal);
       const runPlan = normalizePlanForRun(plan);
+      failureStage = "contingency generation";
       const risks = await generateRisks(runPlan);
+      failureStage = "saving the locked plan";
       const run = await saveLockedRun(runPlan, body.planData, risks);
       return NextResponse.json({ plan: runPlan, run: { ...run, risks } });
     }
@@ -164,8 +169,17 @@ export async function POST(request: Request) {
     return NextResponse.json(buildNextEventQuestion(messages));
 
   } catch (err) {
-    console.error("[/api/chat]", err);
-    if (generatingPlan) return NextResponse.json({ error: "Unable to generate the event plan." }, { status: 500 });
+    console.error(`[${failureStage}] /api/chat`, err);
+    if (generatingPlan) {
+      const error = failureStage === "AI plan generation"
+        ? "The AI could not finish a valid plan. Your answers are saved; please retry."
+        : failureStage === "contingency generation"
+          ? "The plan could not finish preparing its Plan B contingencies. Your answers are saved; please retry."
+          : failureStage === "saving the locked plan"
+            ? "The plan was generated but could not be saved. Check the database connection, then retry."
+            : "Unable to generate the event plan. Your answers are saved; please retry.";
+      return NextResponse.json({ error }, { status: 500 });
+    }
     return NextResponse.json(buildNextEventQuestion(messages));
   }
 }

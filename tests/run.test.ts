@@ -21,9 +21,11 @@ vi.mock("@/lib/run/security", () => ({
 
 import { detectViolations, analyzeImpact } from "@/lib/run/impact";
 import { parseChangeText } from "@/lib/run/intake";
+import { generateRisks } from "@/lib/run/risks";
 import { applySelectedProposal, revertToPreviousVersion } from "@/lib/run/apply";
 import { verifyOptions } from "@/lib/run/verify";
 import { POST as intakePost } from "@/app/api/run/[eventId]/intake/route";
+import { POST as commentPost } from "@/app/api/comment/route";
 import type { RunPlan, RunTask } from "@/lib/run/types";
 
 const ids = {
@@ -187,6 +189,57 @@ describe("RUN change intake", () => {
     );
 
     expect(changes.changes.map((change) => change.type)).toEqual(["DELAY", "GUEST_COUNT"]);
+  });
+});
+
+describe("RUN risk generation fallback", () => {
+  beforeEach(() => {
+    mocks.llmJson.mockReset();
+  });
+
+  it("keeps plan locking available when the risk model fails", async () => {
+    mocks.llmJson.mockRejectedValue(new Error("Model returned invalid contingency JSON"));
+    const plan = makePlan([
+      makeTask(ids.setup, "Outdoor setup", "2026-10-10T09:00:00.000Z", 30),
+      makeTask(ids.caterer, "Catering", "2026-10-10T09:30:00.000Z", 30, [ids.setup]),
+      makeTask(ids.ceremony, "Ceremony close", "2026-10-10T10:00:00.000Z", 30, [ids.caterer]),
+    ]);
+    plan.timeline[1].vendorName = "Event Caterer";
+    plan.constraints = { ...plan.constraints, outdoor: true };
+
+    const risks = await generateRisks(plan);
+
+    expect(risks).toHaveLength(5);
+    expect(risks.map((risk) => risk.triggerType)).toEqual([
+      "DELAY", "VENDOR_CANCELLED", "GUEST_COUNT", "WEATHER", "VENUE_ISSUE",
+    ]);
+    for (const risk of risks) {
+      expect(risk.status).toBe("ready");
+      for (const operation of risk.backupAction) {
+        if (operation.type !== "add_task") {
+          expect(plan.timeline.some((task) => task.id === operation.taskId)).toBe(true);
+        }
+      }
+    }
+  });
+});
+
+describe("Comment API request validation", () => {
+  beforeEach(() => {
+    mocks.llmJson.mockReset();
+  });
+
+  it("accepts nullable event type and city during early planning answers", async () => {
+    mocks.llmJson.mockResolvedValue({ comment: "A lovely choice for your celebration." });
+
+    const response = await commentPost(new Request("https://eventmate.test/api/comment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step: 2, answer: "2026-11-04", eventType: null, city: null }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ comment: "A lovely choice for your celebration." });
   });
 });
 

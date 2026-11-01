@@ -63,7 +63,8 @@ function stripCodeFences(raw: string): string {
 export async function llmJson<T>(
   system: string,
   messages: ChatMessage[],
-  schema: z.ZodType<T>
+  schema: z.ZodType<T>,
+  options: { maxTokens?: number } = {},
 ): Promise<T> {
   const model = process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free";
   const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL ?? "openai/gpt-4o-mini";
@@ -79,6 +80,7 @@ export async function llmJson<T>(
       model: m,
       messages: [systemMessage, ...messages],
       response_format: { type: "json_object" },
+      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     });
 
     const raw = response.choices[0]?.message?.content ?? "";

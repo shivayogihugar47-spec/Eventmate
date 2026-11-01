@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 const RequestSchema = z.object({
   step: z.number().int().min(1).max(100),
   answer: z.string().trim().min(1).max(500),
-  eventType: z.string().max(80).optional(),
-  city: z.string().max(120).optional(),
+  eventType: z.string().max(80).nullish(),
+  city: z.string().max(120).nullish(),
 });
 const CommentSchema = z.object({ comment: z.string().trim().min(1).max(240) });
 
