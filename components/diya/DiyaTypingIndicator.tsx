@@ -3,10 +3,20 @@
 import { Diya } from "./Diya";
 import { useWittyStatus } from "./FloatingDiya";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarDays, Flower2, Sparkles } from "lucide-react";
+import { CalendarDays, Flower2, Sparkles, PartyPopper, Users, Presentation, Music, Trees, Utensils, Cake, type LucideIcon } from "lucide-react";
 
-export function DiyaTypingIndicator({ active }: { active: boolean }) {
-  const line = useWittyStatus(active);
+const EVENT_ICONS: Record<string, [LucideIcon, LucideIcon]> = {
+  wedding: [CalendarDays, Flower2],
+  birthday: [Cake, PartyPopper],
+  community: [Users, Trees],
+  corporate: [Presentation, Users],
+  festival: [Music, Trees],
+  other: [CalendarDays, Sparkles],
+};
+
+export function DiyaTypingIndicator({ active, eventType = "other" }: { active: boolean; eventType?: string }) {
+  const line = useWittyStatus(active, eventType);
+  const [FirstIcon, SecondIcon] = EVENT_ICONS[eventType] ?? EVENT_ICONS.other;
   return (
     <AnimatePresence>
       {active && (
@@ -27,21 +37,21 @@ export function DiyaTypingIndicator({ active }: { active: boolean }) {
               animate={{ y: [0, -4, 0], rotate: [-6, 6, -6] }}
               transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
             >
-              <CalendarDays size={14} />
+              <FirstIcon size={14} />
             </motion.div>
             <motion.div
               className="absolute right-0 top-7 flex h-8 w-8 items-center justify-center rounded-full border border-[#E7DAB6] bg-[#FFF9E8] text-[#A57C2F] shadow-sm"
               animate={{ y: [0, 4, 0], rotate: [5, -5, 5] }}
               transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
             >
-              <Flower2 size={15} />
+              <SecondIcon size={15} />
             </motion.div>
             <motion.div
               className="absolute bottom-1 right-7 flex h-7 w-7 items-center justify-center rounded-full border border-[#D5E0D3] bg-[#F3F7F0] text-[#547761] shadow-sm"
               animate={{ scale: [1, 1.12, 1] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             >
-              <Sparkles size={13} />
+              {eventType === "corporate" ? <Utensils size={13} /> : <Sparkles size={13} />}
             </motion.div>
             <motion.div
               className="absolute inset-5 rounded-full bg-[#E9EFE4]"

@@ -937,6 +937,15 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
   const questionFlow = getEventQuestionFlow(collectedData.eventType);
   const sidebarQuestions = collectedData.eventType ? questionFlow : questionFlow.slice(0, 1);
   const totalQuestions = questionFlow.length;
+  const generationCopy: Record<string, { heading: string; stages: [string, string, string] }> = {
+    wedding: { heading: "Bringing your wedding day together", stages: ["Your traditions", "The celebration", "Personal touches"] },
+    birthday: { heading: "Dreaming up a birthday to remember", stages: ["The guest of honor", "Party moments", "Cake & details"] },
+    community: { heading: "Bringing your community together", stages: ["Your community", "Shared activities", "Access & care"] },
+    corporate: { heading: "Building a sharper event plan", stages: ["Your objective", "The agenda", "AV & logistics"] },
+    festival: { heading: "Getting the festival ready", stages: ["The occasion", "Program & flow", "Site operations"] },
+    other: { heading: "Gathering the good stuff", stages: ["Your details", "The schedule", "Finishing touches"] },
+  };
+  const currentGenerationCopy = generationCopy[collectedData.eventType ?? "other"] ?? generationCopy.other;
   const activeColor = collectedData?.eventType ? (EVENT_PAL[collectedData.eventType]?.fg ?? "#6366F1") : "#6366F1";
   const progress = answers.length;
 
@@ -1167,13 +1176,13 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
                       transition={{duration:1.4,repeat:Infinity}} />
                     Event plan in the works
                   </motion.div>
-                  <DiyaTypingIndicator active={true}/>
+                  <DiyaTypingIndicator active={true} eventType={collectedData.eventType ?? "other"}/>
                   <div className="mt-5">
-                    <p className="font-display text-xl font-extrabold text-[#263B32]">Gathering the good stuff</p>
-                    <p className="mt-1 text-sm text-[#788278]">Your event details are becoming a thoughtful plan.</p>
+                    <p className="font-display text-xl font-extrabold text-[#263B32]">{currentGenerationCopy.heading}</p>
+                    <p className="mt-1 text-sm text-[#788278]">Eve is shaping the details around your {collectedData.eventType === "corporate" ? "business event" : collectedData.eventType === "other" ? "gathering" : collectedData.eventType ?? "event"}.</p>
                   </div>
                   <div className="mt-6 flex w-full max-w-[280px] items-center justify-between gap-2 text-[9px] font-bold text-[#68756B]">
-                    {["Your details","The schedule","Finishing touches"].map((label,index)=>(
+                    {currentGenerationCopy.stages.map((label,index)=>(
                       <div key={label} className="flex flex-1 flex-col items-center gap-2">
                         <div className="relative h-1 w-full overflow-hidden rounded-full bg-[#DAD7CB]">
                           <motion.div

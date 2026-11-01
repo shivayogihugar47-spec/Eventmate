@@ -26,6 +26,15 @@ const WITTY_LINES = [
   "Sourcing the best marigolds...",
 ];
 
+const EVENT_WITTY_LINES: Record<string, string[]> = {
+  wedding: ["Lining up the baraat...", "Checking the mandap details...", "Finding the perfect first-dance song...", "Making room for all the family photos...", "Counting the laddoos (for quality)..."],
+  birthday: ["Making sure the cake gets a grand entrance...", "Picking the party playlist...", "Planning one excellent surprise...", "Saving room for extra frosting...", "Getting the birthday candles in formation..."],
+  community: ["Making space for every neighbor...", "Rounding up local performers...", "Mapping an easy-to-join-in flow...", "Finding the best spot for the shared meal...", "Making sure everyone feels welcome..."],
+  corporate: ["Balancing the agenda and coffee breaks...", "Checking the microphones before the big ideas...", "Making room for useful conversations...", "Lining up the breakout sessions...", "Keeping the keynote on schedule..."],
+  festival: ["Mapping the crowd flow...", "Checking the stage and sound plan...", "Making room for one more food stall...", "Coordinating the opening procession...", "Planning a smooth festival run..."],
+  other: WITTY_LINES,
+};
+
 export function FloatingDiya() {
   const { speechVisible, isAsleep, partyMode, mascotPref, wake, sleep, setMascotPref } = useDiya();
   const [showSettings, setShowSettings] = useState(false);
@@ -193,15 +202,16 @@ export function FloatingDiya() {
 }
 
 // ── Witty status lines hook (shared with DiyaTypingIndicator) ────────────────
-export function useWittyStatus(active: boolean): string {
-  const [line, setLine] = useState(WITTY_LINES[0]);
+export function useWittyStatus(active: boolean, eventType = "other"): string {
+  const [line, setLine] = useState((EVENT_WITTY_LINES[eventType] ?? EVENT_WITTY_LINES.other)[0]);
   useEffect(() => {
     if (!active) return;
-    setLine(WITTY_LINES[Math.floor(Math.random() * WITTY_LINES.length)]);
+    const lines = EVENT_WITTY_LINES[eventType] ?? EVENT_WITTY_LINES.other;
+    setLine(lines[Math.floor(Math.random() * lines.length)]);
     const id = setInterval(() => {
-      setLine(WITTY_LINES[Math.floor(Math.random() * WITTY_LINES.length)]);
+      setLine(lines[Math.floor(Math.random() * lines.length)]);
     }, 2200);
     return () => clearInterval(id);
-  }, [active]);
+  }, [active, eventType]);
   return line;
 }
