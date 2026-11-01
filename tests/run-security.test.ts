@@ -27,6 +27,8 @@ describe("RUN owner-link persistence", () => {
       guestCount: 30,
       city: "Belagavi",
       budgetTotal: 5000,
+      accessibilityNeeds: "Wheelchair access and vegetarian meals",
+      ageMix: "A mix of ages",
       timeline: [{
         id: taskId,
         task: "Prepare the venue",
@@ -49,19 +51,26 @@ describe("RUN owner-link persistence", () => {
     const eventInsert = mocks.sql.mock.calls.find((call) =>
       call[0].join("").includes("owner_user_id"),
     );
+    expect(eventInsert?.[0].join("")).toContain("organizer_token_expires_at");
     expect(eventInsert?.slice(1)).toContain("test-user-id");
+    const organizerTokenExpiresAt = Date.parse(String(eventInsert?.[7]));
+    expect(organizerTokenExpiresAt).toBeGreaterThan(Date.now());
+    expect(organizerTokenExpiresAt).toBeLessThan(Date.now() + 91 * 24 * 60 * 60_000);
     const ownerLinksJson = values.find(
       (value): value is string => typeof value === "string" && value.includes('"expires_at"'),
     );
     expect(ownerLinksJson).toBeDefined();
     const ownerLinks = JSON.parse(ownerLinksJson!);
     expect(ownerLinks).toHaveLength(1);
+    expect(ownerLinks[0].token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(ownerLinks[0]).toMatchObject({
       token: expect.any(String),
       task_ids: [taskId],
       expires_at: expect.any(String),
     });
     expect(Number.isNaN(Date.parse(ownerLinks[0].expires_at))).toBe(false);
+    expect(Date.parse(ownerLinks[0].expires_at)).toBeGreaterThan(Date.now());
+    expect(Date.parse(ownerLinks[0].expires_at)).toBeLessThan(Date.now() + 91 * 24 * 60 * 60_000);
     expect(ownerLinks[0]).not.toHaveProperty("taskIds");
     expect(ownerLinks[0]).not.toHaveProperty("expiresAt");
   });

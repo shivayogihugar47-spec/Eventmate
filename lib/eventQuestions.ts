@@ -12,6 +12,8 @@ export interface EventCollectedData {
   guestCount: string | null;
   city: string | null;
   budgetTotal: string | null;
+  accessibilityNeeds: string | null;
+  ageMix: string | null;
   theme: string | null;
   venueStyle: string | null;
   cateringType: string | null;
@@ -79,6 +81,24 @@ const sharedQuestions: Omit<EventQuestion, "step">[] = [
     title: "What's your total budget range?",
     subtitle: "This helps make every part of the plan realistic.",
     options: BUDGET_OPTIONS,
+  },
+];
+
+const guestExperienceQuestions: Omit<EventQuestion, "step">[] = [
+  {
+    key: "accessibilityNeeds",
+    label: "Accessibility & dietary needs",
+    title: "What accessibility or dietary needs should we plan for?",
+    subtitle: "Tell us what guests need to feel comfortable and included; you can list more than one need.",
+    inputPlaceholder: "E.g. wheelchair access, step-free routes, seating for elderly guests, dietary restrictions...",
+    inputType: "text",
+  },
+  {
+    key: "ageMix",
+    label: "Age mix",
+    title: "What is the age mix of your guests?",
+    subtitle: "This helps us suggest activities and food that suit the whole group.",
+    options: ["Mostly children", "Mostly teens and young adults", "Mostly adults", "Mostly older adults", "A mix of ages", "All ages represented"].map((label) => ({ label, value: label })),
   },
 ];
 
@@ -166,7 +186,11 @@ function normalizeEventType(value: string | undefined): string | null {
 
 export function getEventQuestionFlow(eventType: string | null | undefined): EventQuestion[] {
   const normalizedType = normalizeEventType(eventType ?? undefined);
-  const questions = [...sharedQuestions, ...(normalizedType ? occasionQuestions[normalizedType] : occasionQuestions.other)];
+  const questions = [
+    ...sharedQuestions,
+    ...(normalizedType ? occasionQuestions[normalizedType] : occasionQuestions.other),
+    ...guestExperienceQuestions,
+  ];
   return questions.map((question, index) => ({ ...question, step: index + 1 }));
 }
 
@@ -189,6 +213,8 @@ function createCollectedData(): EventCollectedData {
     guestCount: null,
     city: null,
     budgetTotal: null,
+    accessibilityNeeds: null,
+    ageMix: null,
     theme: null,
     venueStyle: null,
     cateringType: null,
@@ -241,6 +267,10 @@ export function buildNextEventQuestion(messages: EventChatMessage[]) {
 
   const subtitle = nextQuestion.key === "budgetTotal" && data.city
     ? `I'll make sure every rupee is well-spent in ${data.city}.`
+    : nextQuestion.key === "accessibilityNeeds"
+      ? "We'll use these needs to guide venue access, seating, and the menu."
+      : nextQuestion.key === "ageMix"
+        ? "I'll tailor menu ideas and activities to the ages in your group."
     : nextQuestion.key === "eventDate"
       ? `${eventTypeLabels[selectedType]}! A wonderful choice. Let's find the right date.`
       : nextQuestion.subtitle;

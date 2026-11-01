@@ -25,6 +25,11 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+export function publicRateLimitIdentity(request: Request): string {
+  const forwardedIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return hashToken(`ip:${forwardedIp || "anonymous"}`);
+}
+
 export function rateLimitIdentity(request: Request): string {
   const bearer = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{32,})$/)?.[1] ?? "missing";
   return hashToken(bearer);
@@ -34,7 +39,7 @@ export async function saveLockedRun(
   plan: RunPlan,
   answers: Record<string, unknown>,
   risks: { title: string; triggerType: string; likelihood: string; backupAction: unknown[] }[],
-  ownerUserId: string,
+  ownerUserId: string | null,
 ): Promise<{ eventId: string; organizerToken: string; version: number; ownerLinks: { owner: string; token: string; taskIds: string[]; expiresAt: string }[] }> {
   const eventId = crypto.randomUUID();
   const organizerToken = createBearerToken();
@@ -67,9 +72,9 @@ export async function saveLockedRun(
 
   await sql.transaction([
     sql`INSERT INTO events
-      (id, stage, answers, event_type, event_date, budget_total, current_plan_version, organizer_token_hash, owner_user_id, event_end_at, venue_closes_at, outdoor)
+      (id, stage, answers, event_type, event_date, budget_total, current_plan_version, organizer_token_hash, organizer_token_expires_at, owner_user_id, event_end_at, venue_closes_at, outdoor)
       VALUES (${eventId}, 'run', ${JSON.stringify(answers)}, ${plan.eventType}, ${plan.eventDate},
-        ${plan.budgetTotal}, 1, ${hashToken(organizerToken)}, ${ownerUserId}, ${plan.constraints?.eventEndsAt ?? null},
+        ${plan.budgetTotal}, 1, ${hashToken(organizerToken)}, ${expiresAt}, ${ownerUserId}, ${plan.constraints?.eventEndsAt ?? null},
         ${plan.constraints?.venueClosesAt ?? null}, ${Boolean(plan.constraints?.outdoor)})`,
     sql`INSERT INTO plan_versions (event_id, version, plan, change_note)
       VALUES (${eventId}, 1, ${JSON.stringify(plan)}, 'Plan locked')`,
@@ -107,9 +112,12 @@ export async function loadOrganizerRun(request: Request, eventId: string): Promi
   if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(eventId)) throw new Error("Event not found.");
   const bearer = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{32,})$/)?.[1];
   if (!bearer) throw new Error("Organizer authorization is required.");
-  const stored = await sql`SELECT organizer_token_hash, current_plan_version, answers
+  const stored = await sql`SELECT organizer_token_hash, organizer_token_expires_at, current_plan_version, answers
     FROM events WHERE id = ${eventId} LIMIT 1`;
   if (!stored[0]?.organizer_token_hash) throw new Error("Event not found.");
+  if (!stored[0].organizer_token_expires_at || Date.parse(String(stored[0].organizer_token_expires_at)) <= Date.now()) {
+    throw new Error("Organizer authorization is invalid or expired.");
+  }
   const expected = Buffer.from(String(stored[0].organizer_token_hash), "hex");
   const actual = Buffer.from(hashToken(bearer), "hex");
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
@@ -154,7 +162,7 @@ export async function loadOwnedOrganizerRun(request: Request, eventId: string): 
 }
 
 export async function loadOwnerRun(token: string): Promise<OwnerRun> {
-  if (!/^[A-Za-z0-9_-]{32,100}$/.test(token)) throw new Error("Owner link is invalid or expired.");
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("Owner link is invalid or expired.");
   const links = await sql`SELECT event_id, task_ids FROM owner_links
     WHERE token = ${token} AND expires_at > now() LIMIT 1`;
   if (!links[0]) throw new Error("Owner link is invalid or expired.");

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   loadOrganizerRun: vi.fn(),
   consumeRateLimit: vi.fn(),
   rateLimitIdentity: vi.fn(),
+  publicRateLimitIdentity: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -18,6 +19,7 @@ vi.mock("@/lib/run/security", () => ({
   loadOwnedOrganizerRun: mocks.loadOrganizerRun,
   consumeRateLimit: mocks.consumeRateLimit,
   rateLimitIdentity: mocks.rateLimitIdentity,
+  publicRateLimitIdentity: mocks.publicRateLimitIdentity,
 }));
 
 import { detectViolations, analyzeImpact } from "@/lib/run/impact";
@@ -64,6 +66,8 @@ function makePlan(timeline: RunTask[]): RunPlan {
     city: "Pune",
     budgetTotal: 100000,
     theme: "Garden",
+    accessibilityNeeds: "Wheelchair access",
+    ageMix: "A mix of ages",
     timeline,
     budgetBreakdown: [{ category: "Venue", allocated: 100000, percentage: 100, icon: "building" }],
     vendors: [],
@@ -174,6 +178,8 @@ describe("RUN impact and verification", () => {
 describe("RUN change intake", () => {
   beforeEach(() => {
     mocks.llmJson.mockReset();
+    mocks.consumeRateLimit.mockReset().mockResolvedValue(true);
+    mocks.publicRateLimitIdentity.mockReset().mockReturnValue("test-ip");
   });
 
   it("returns multiple validated changes from one message", async () => {
@@ -450,7 +456,7 @@ describe("RUN version control", () => {
 
     await expect(applySelectedProposal({
       run: { eventId: "event", version: 3, plan: makePlan([]) },
-      eventId: "event",
+      eventId: ids.setup,
       proposalId: "proposal",
       optionIndex: 0,
       expectedVersion: 2,
@@ -473,12 +479,12 @@ describe("RUN version control", () => {
     });
 
     const response = await intakePost(
-      new Request("https://eventmate.test/api/run/event/intake", {
+      new Request(`https://eventmate.test/api/run/${ids.setup}/intake`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version: 2, text: "The caterer is late" }),
       }),
-      { params: Promise.resolve({ eventId: "event" }) },
+      { params: Promise.resolve({ eventId: ids.setup }) },
     );
 
     expect(response.status).toBe(409);

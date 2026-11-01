@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS events (
   budget_total NUMERIC,
   current_plan_version INT NOT NULL DEFAULT 0,
   organizer_token_hash TEXT,
+  organizer_token_expires_at TIMESTAMPTZ,
   owner_user_id TEXT,
   event_end_at TIMESTAMPTZ,
   venue_closes_at TEXT,
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS plan_versions (
 
 ALTER TABLE events ADD COLUMN IF NOT EXISTS current_plan_version INT NOT NULL DEFAULT 0;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_token_hash TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_token_expires_at TIMESTAMPTZ;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_user_id TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_end_at TIMESTAMPTZ;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS venue_closes_at TEXT;

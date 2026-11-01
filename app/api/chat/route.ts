@@ -5,8 +5,10 @@ import { normalizeBudgetAmounts, parseBudget } from "@/lib/budget";
 import { buildNextEventQuestion, type EventChatMessage } from "@/lib/eventQuestions";
 import { normalizePlanForRun } from "@/lib/run/plan";
 import { generateRisks } from "@/lib/run/risks";
-import { saveLockedRun } from "@/lib/run/security";
+import { consumeRateLimit, publicRateLimitIdentity, saveLockedRun } from "@/lib/run/security";
 import { getAuthenticatedUser } from "@/lib/auth/server";
+import { authConfig } from "@/lib/auth";
+import { parseJsonBody } from "@/lib/apiRequest";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ export interface EventPlan {
   eventType: string; eventDate: string; guestCount: number;
   city: string; budgetTotal: number; theme?: string;
   venueStyle?: string; cateringType?: string; specialRequirements?: string;
+  accessibilityNeeds: string; ageMix: string;
   eventDetails?: Record<string, string>;
   highlights?: string[];
   timeline: TimelineItem[]; budgetBreakdown: BudgetItem[];
@@ -57,7 +60,9 @@ const GeneratedPlanSchema = z.object({
   venueStyle: z.string().max(120).optional(),
   cateringType: z.string().max(120).optional(),
   specialRequirements: z.string().max(2000).optional(),
-  eventDetails: z.record(z.string(), z.string()).optional(),
+  accessibilityNeeds: z.string().trim().min(1).max(500),
+  ageMix: z.string().trim().min(1).max(120),
+  eventDetails: z.record(z.string().max(80), z.string().max(500)).optional(),
   highlights: z.array(z.string().max(240)).length(4),
   timeline: z.array(z.object({
     time: z.string().min(1).max(40),
@@ -92,8 +97,32 @@ const GeneratedPlanSchema = z.object({
   })).length(12),
 });
 
+const PlanDataSchema = z.object({
+  eventType: z.string().trim().min(1).max(80).nullable(),
+  eventDate: z.string().trim().min(1).max(40).nullable(),
+  guestCount: z.string().trim().min(1).max(80).nullable(),
+  city: z.string().trim().min(1).max(120).nullable(),
+  budgetTotal: z.string().trim().min(1).max(80).nullable(),
+  accessibilityNeeds: z.string().trim().min(1).max(500).nullable(),
+  ageMix: z.string().trim().min(1).max(120).nullable(),
+  theme: z.string().max(120).nullable(),
+  venueStyle: z.string().max(120).nullable(),
+  cateringType: z.string().max(120).nullable(),
+  specialRequirements: z.string().max(500).nullable(),
+  eventDetails: z.record(z.string().max(80), z.string().max(500).nullable()).optional(),
+}).strict();
+
+const ChatRequestSchema = z.object({
+  messages: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().max(1200),
+  })).max(30),
+  generatePlan: z.boolean().optional(),
+  planData: PlanDataSchema.optional(),
+}).strict();
+
 // ─── Plan generation prompt ───────────────────────────────────────────────────
-function buildPlanPrompt(d: Record<string, string | null>): string {
+function buildPlanPrompt(d: z.infer<typeof PlanDataSchema>): string {
   const budgetTotal = parseBudget(d.budgetTotal ?? "");
   return `You are a professional event planner. Generate a complete, detailed event plan as JSON only (no markdown).
 
@@ -101,6 +130,8 @@ Event: ${d.eventType}, Date: ${d.eventDate}, Guests: ${d.guestCount}
 City: ${d.city}, Budget: ${d.budgetTotal} (planning amount: ₹${budgetTotal}), Theme: ${d.theme ?? "Classic & Elegant"}
 Venue: ${d.venueStyle ?? "TBD"}, Catering: ${d.cateringType ?? "TBD"}
 Special: ${d.specialRequirements ?? "None"}
+Accessibility and dietary needs: ${d.accessibilityNeeds}
+Age mix: ${d.ageMix}
 Occasion-specific details: ${JSON.stringify(d.eventDetails ?? {})}
 
 Return ONLY this JSON structure:
@@ -114,6 +145,8 @@ Return ONLY this JSON structure:
   "venueStyle": "${d.venueStyle ?? "Indoor"}",
   "cateringType": "${d.cateringType ?? "Both"}",
   "specialRequirements": "${d.specialRequirements ?? "None"}",
+  "accessibilityNeeds": "${d.accessibilityNeeds}",
+  "ageMix": "${d.ageMix}",
   "eventDetails": ${JSON.stringify(d.eventDetails ?? {})},
   "highlights": ["string1","string2","string3","string4"],
   "timeline": [{"time":"HH:MM AM/PM","task":"...","owner":"...","description":"...","status":"pending","icon":"lucide-name"}],
@@ -131,6 +164,8 @@ Requirements:
 - vendors: exactly 10 generic vendor categories with planning descriptions and rough cost estimates; use names like "Wedding venue search" or "Local catering options", never invent a real business name, address, phone number, website, or claim a business is available
 - You do not have live web search. Real local business listings are searched separately for the selected city; do not present generated vendor ideas as real businesses
 - checklist: exactly 12 action items across categories: Venue, Catering, Entertainment, Decor, Guest Management, Documentation
+- Accessibility needs: include concrete venue-access and seating tasks in the checklist and timeline. Account for step-free routes, wheelchair access, seating/rest areas for elderly guests, and any dietary restrictions provided. Do not invent needs the organizer did not mention.
+- Age mix: tailor menu and activity suggestions in the catering/vendor descriptions, highlights, and checklist to "${d.ageMix}".
 - Use occasion-specific details to tailor the timeline, vendors, checklist, and guest experience. For corporate events, account for the format, objective, duration, and AV/production needs; for weddings, account for ceremony traditions and personal moments.
 - Make everything specific to ${d.eventType} in ${d.city} with ${d.theme} theme`;
 }
@@ -141,20 +176,35 @@ export async function POST(request: Request) {
   let generatingPlan = false;
   let failureStage = "request processing";
   try {
-    const body = await request.json() as {
-      messages: EventChatMessage[];
-      generatePlan?: boolean;
-      planData?: Record<string, string | null>;
-    };
-    messages = body.messages ?? [];
+    const parsedBody = await parseJsonBody(request, ChatRequestSchema, 64 * 1024);
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
+    }
+    const body = parsedBody.data;
+    messages = body.messages;
     generatingPlan = Boolean(body.generatePlan && body.planData);
 
     // ── Plan generation mode ────────────────────────────────────────────────
+    if (body.generatePlan && !body.planData) {
+      return NextResponse.json({ error: "The complete event details are required to generate a plan." }, { status: 400 });
+    }
     if (generatingPlan && body.planData) {
-      const user = await getAuthenticatedUser();
-      if (!user) {
-        return NextResponse.json({ error: "Sign in to save and generate your event plan." }, { status: 401 });
+      const requiredFields = [
+        body.planData.eventType,
+        body.planData.eventDate,
+        body.planData.guestCount,
+        body.planData.city,
+        body.planData.budgetTotal,
+        body.planData.accessibilityNeeds,
+        body.planData.ageMix,
+      ];
+      if (requiredFields.some((value) => !value?.trim())) {
+        return NextResponse.json({ error: "Answer the accessibility and age-mix questions before generating your plan." }, { status: 400 });
       }
+      if (!await consumeRateLimit(`llm:plan:${publicRateLimitIdentity(request)}`, 5)) {
+        return NextResponse.json({ error: "You have reached the planning limit. Please wait a minute and try again." }, { status: 429 });
+      }
+      const user = authConfig.isConfigured ? await getAuthenticatedUser() : null;
       failureStage = "AI plan generation";
       const plan = await llmJson(
         "You are a professional event planner. Return a detailed plan that matches the exact JSON structure requested by the user.",
@@ -162,13 +212,15 @@ export async function POST(request: Request) {
         GeneratedPlanSchema,
         { maxTokens: 6000 },
       );
+      plan.accessibilityNeeds = body.planData.accessibilityNeeds?.trim() || "Not specified";
+      plan.ageMix = body.planData.ageMix?.trim() || "Not specified";
       plan.budgetTotal = parseBudget(body.planData.budgetTotal ?? "");
       plan.budgetBreakdown = normalizeBudgetAmounts(plan.budgetBreakdown, plan.budgetTotal);
       const runPlan = normalizePlanForRun(plan);
       failureStage = "contingency generation";
       const risks = await generateRisks(runPlan);
       failureStage = "saving the locked plan";
-      const run = await saveLockedRun(runPlan, body.planData, risks, user.id);
+      const run = await saveLockedRun(runPlan, body.planData, risks, user?.id ?? null);
       return NextResponse.json({ plan: runPlan, run: { ...run, risks } });
     }
 
@@ -178,18 +230,16 @@ export async function POST(request: Request) {
     console.error(`[${failureStage}] /api/chat`, err);
     if (generatingPlan) {
       const error = failureStage === "AI plan generation"
-        ? "The AI could not finish a valid plan. Your answers are saved; please retry."
+        ? "The AI could not finish a valid plan. Your answers are still here; please retry."
         : failureStage === "contingency generation"
-          ? "The plan could not finish preparing its Plan B contingencies. Your answers are saved; please retry."
+          ? "The plan could not finish preparing its Plan B contingencies. Your answers are still here; please retry."
           : failureStage === "saving the locked plan"
             ? "The plan was generated but could not be saved. Check the database connection, then retry."
-            : "Unable to generate the event plan. Your answers are saved; please retry.";
-      return NextResponse.json({
-        error,
-        ...(process.env.NODE_ENV === "development" && err instanceof Error
-          ? { detail: err.message.slice(0, 500) }
-          : {}),
-      }, { status: 500 });
+            : "Unable to generate the event plan. Your answers are still here; please retry.";
+      return NextResponse.json({ error }, { status: failureStage === "AI plan generation" || failureStage === "contingency generation" ? 503 : 500 });
+    }
+    if (err instanceof z.ZodError || err instanceof SyntaxError) {
+      return NextResponse.json({ error: "The planning request is invalid or too long." }, { status: 400 });
     }
     return NextResponse.json(buildNextEventQuestion(messages));
   }

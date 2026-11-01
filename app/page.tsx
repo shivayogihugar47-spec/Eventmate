@@ -14,7 +14,6 @@ import type { EventPlan, AssistantCard, TimelineItem, BudgetItem, ChecklistItem 
 import { useDiya } from "@/lib/diyaStore";
 import { buildNextEventQuestion, getEventQuestionFlow, type EventCollectedData } from "@/lib/eventQuestions";
 import { formatINR } from "@/lib/budget";
-import { CommandCenter } from "@/components/diya/CommandCenter";
 import type { RunPlan } from "@/lib/run/types";
 import { getVendorSearchLinks, VENDOR_CATEGORIES } from "@/lib/vendorCategories";
 import { AuthDialog, type AccountUser } from "@/components/auth/AuthDialog";
@@ -24,6 +23,7 @@ import { authClient } from "@/lib/auth/client";
 const Diya    = dynamic(() => import("@/components/diya/Diya").then(m => m.Diya), { ssr: false });
 const DiyaTypingIndicator = dynamic(() => import("@/components/diya/DiyaTypingIndicator").then(m => m.DiyaTypingIndicator), { ssr: false });
 const PlanLockedCelebration = dynamic(() => import("@/components/diya/DiyaCelebration").then(m => m.PlanLockedCelebration), { ssr: false });
+const CommandCenter = dynamic(() => import("@/components/diya/CommandCenter").then(m => m.CommandCenter), { ssr: false });
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const PAL = [
@@ -66,6 +66,7 @@ function FloatingOrbs({ color = "#6366F1" }: { color?: string }) {
 const STEP_ICONS: Record<number, LucideIcon> = { 1:Gem, 2:Calendar, 3:Users, 4:MapPin, 5:Rupee, 6:Sparkles, 7:Building2, 8:Utensils, 9:Heart };
 const QUESTION_ICONS: Record<string, LucideIcon> = {
   eventType: Gem, eventDate: Calendar, guestCount: Users, city: MapPin, budgetTotal: Rupee,
+  accessibilityNeeds: Heart, ageMix: Users,
   theme: Sparkles, venueStyle: Building2, cateringType: Utensils, specialRequirements: Heart,
   "eventDetails.ceremonyStyle": Gem, "eventDetails.format": Calendar, "eventDetails.objective": Lightbulb,
   "eventDetails.duration": Clock, "eventDetails.productionNeeds": Music, "eventDetails.honoree": Cake,
@@ -168,12 +169,12 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
             <div className="rounded-2xl border border-[#E6E0D3] bg-[#FFFEFA] p-4">
               <label htmlFor="custom-budget" className="mb-2 block text-xs font-bold text-[#344B3B]">Or enter an exact budget in rupees</label>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-[#A77D2B]">₹</span>
+                <span className="text-sm font-bold text-[#765D2E]">₹</span>
                 <input id="custom-budget" ref={inputRef} type="number" min="1" step="1" inputMode="numeric"
                   value={textVal} onChange={event=>setTextVal(event.target.value)}
                   onKeyDown={event=>{if(event.key==="Enter"&&canSubmitCustomBudget)submit(`₹${customBudgetAmount.toLocaleString("en-IN")}`,`₹${customBudgetAmount.toLocaleString("en-IN")}`);}}
                   placeholder="e.g. 75000"
-                  className="min-w-0 flex-1 border-b border-[#DCD6C8] bg-transparent py-2 text-sm font-semibold text-[#263B32] outline-none placeholder:font-normal placeholder:text-[#A5ADA6] focus:border-[#A77D2B]"/>
+                  className="min-w-0 flex-1 border-b border-[#DCD6C8] bg-transparent py-2 text-sm font-semibold text-[#263B32] outline-none placeholder:font-normal placeholder:text-[#66736A] focus:border-[#A77D2B]"/>
                 <button type="button"
                   onClick={()=>canSubmitCustomBudget&&submit(`₹${customBudgetAmount.toLocaleString("en-IN")}`,`₹${customBudgetAmount.toLocaleString("en-IN")}`)}
                   disabled={!canSubmitCustomBudget}
@@ -181,7 +182,7 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
                   Use amount
                 </button>
               </div>
-              <p className="mt-2 text-[10px] text-[#68796F]">Ranges use their midpoint; ₹1Cr+ starts at ₹1 crore.</p>
+              <p className="mt-2 text-[10px] text-[#66736A]">Ranges use their midpoint; ₹1Cr+ starts at ₹1 crore.</p>
             </div>
           )}
         </div>
@@ -195,7 +196,7 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
               <div className="rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9CA3AF]">Choose your day</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#66736A]">Choose your day</p>
                     <p className="mt-1 font-display text-lg font-extrabold text-[#202B27] sm:text-xl">{monthLabel}</p>
                   </div>
                   <div className="flex items-center gap-1">
@@ -215,7 +216,7 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
 
                 <div className="grid grid-cols-7 gap-y-1 text-center">
                   {["Su","Mo","Tu","We","Th","Fr","Sa"].map(day=>(
-                    <span key={day} className="flex h-9 items-center justify-center text-[10px] font-bold uppercase text-[#9CA3AF] sm:h-10 sm:text-xs">{day}</span>
+                    <span key={day} className="flex h-9 items-center justify-center text-[10px] font-bold uppercase text-[#66736A] sm:h-10 sm:text-xs">{day}</span>
                   ))}
                   {calendarDays.map((entry,index)=>entry?(
                     <button key={entry.value} type="button" disabled={entry.disabled}
@@ -227,7 +228,7 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
                     </button>
                   ):<span key={`empty-${index}`} className="aspect-square"/>) }
                 </div>
-                <div className="mt-3 flex items-center justify-between border-t border-[#F0F0EC] pt-3 text-[10px] text-[#9CA3AF] sm:text-xs">
+                <div className="mt-3 flex items-center justify-between border-t border-[#F0F0EC] pt-3 text-[10px] text-[#66736A] sm:text-xs">
                   <span>Past dates unavailable</span>
                   <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#214E43]"/>Selected</span>
                 </div>
@@ -253,7 +254,7 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
                   <div className="absolute left-[18%] top-[-40%] h-[180%] w-px rotate-[24deg] bg-[#D8E3D8]/30"/>
                   <div className="absolute left-[58%] top-[-30%] h-[170%] w-px rotate-[-18deg] bg-[#D8E3D8]/30"/>
                   <div className="absolute bottom-[18%] left-[12%] h-px w-[82%] rotate-[7deg] bg-[#D8E3D8]/20"/>
-                  <div className="absolute left-[8%] top-[12%] text-[9px] font-bold uppercase tracking-[0.2em] text-white/60">Your event, your coordinates</div>
+                  <div className="absolute left-[8%] top-[12%] text-[9px] font-bold uppercase tracking-[0.2em] text-white/90">Your event, your coordinates</div>
                   <AnimatePresence mode="wait">
                     {textVal.trim()?(
                       <motion.div key={textVal.trim()} initial={{opacity:0,y:-10,scale:0.88}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:8}}
@@ -271,17 +272,17 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  <div className="absolute bottom-3 right-3 text-[9px] font-bold uppercase tracking-widest text-white/45">PLACE PIN · {textVal.trim()?"SET":"WAITING"}</div>
+                  <div className="absolute bottom-3 right-3 text-[9px] font-bold uppercase tracking-widest text-white/90">PLACE PIN · {textVal.trim()?"SET":"WAITING"}</div>
                 </div>
 
                 <div>
-                  <label htmlFor="custom-city" className="mb-2 block text-[10px] font-bold uppercase tracking-[0.14em] text-[#89938C]">Where should the celebration happen?</label>
+                  <label htmlFor="custom-city" className="mb-2 block text-[10px] font-bold uppercase tracking-[0.14em] text-[#66736A]">Where should the celebration happen?</label>
                   <div className="relative">
                     <input id="custom-city" ref={inputRef} type="text" value={textVal}
                       onChange={e=>setTextVal(e.target.value)}
                       onKeyDown={e=>{if(e.key==="Enter"&&textVal.trim())submit(textVal.trim(),textVal.trim());}}
                       placeholder="Enter any city, town, or place"
-                      className="w-full border-0 border-b-2 border-[#DADDD2] bg-transparent py-3 pr-36 text-lg font-semibold text-[#202B27] outline-none placeholder:text-sm placeholder:font-normal placeholder:text-[#B7BDB8] focus:border-[#315C4C] sm:text-xl"/>
+                      className="w-full border-0 border-b-2 border-[#DADDD2] bg-transparent py-3 pr-36 text-lg font-semibold text-[#202B27] outline-none placeholder:text-sm placeholder:font-normal placeholder:text-[#66736A] focus:border-[#315C4C] sm:text-xl"/>
                     <motion.button onClick={()=>textVal.trim()&&submit(textVal.trim(),textVal.trim())}
                       whileHover={{scale:1.06}} whileTap={{scale:0.94}} disabled={!textVal.trim()}
                       aria-label="Use this place"
@@ -289,7 +290,7 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
                       Use this place <ArrowRight size={15}/>
                     </motion.button>
                   </div>
-                  <p className="mt-2 text-[10px] text-[#A0A8A2]">Type any location. Nothing is preselected.</p>
+                  <p className="mt-2 text-[10px] text-[#66736A]">Type any location. Nothing is preselected.</p>
                 </div>
               </div>
             ) : (
@@ -299,8 +300,10 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
                 <input ref={inputRef} type="text" value={textVal}
                   onChange={e=>setTextVal(e.target.value)}
                   onKeyDown={e=>{if(e.key==="Enter"&&textVal.trim())submit(textVal.trim(),textVal.trim());}}
+                  aria-label={card.title}
+                  maxLength={500}
                   placeholder={card.inputPlaceholder??"Type your answer…"}
-                  className="w-full text-xl font-semibold text-[#111827] bg-transparent outline-none placeholder:text-[#E0E0E0] placeholder:font-normal py-2 pr-14 border-0"/>
+                  className="w-full text-xl font-semibold text-[#111827] bg-transparent outline-none placeholder:text-[#66736A] placeholder:font-normal py-2 pr-14 border-0"/>
                 <div className="h-[2px] w-full rounded-full overflow-hidden" style={{background:"#F3F4F6"}}>
                   <motion.div className="h-full rounded-full bg-[#6366F1]"
                     animate={{width:textVal?"100%":"0%"}} transition={{duration:0.3}}/>
@@ -311,14 +314,14 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
                   <ArrowRight size={16} className="text-white"/>
                 </motion.button>
               </div>
-              <p className="text-xs text-[#C4C4C4]">Press Enter or click →</p>
+              <p className="text-xs text-[#66736A]">Press Enter or click →</p>
             </div>
             )
           )}
         </motion.div>
       )}
 
-      {card.hint && card.step !== 4 && !(card.step === 2 && textVal) && <p className="text-[11px] text-[#C4C4C4] mt-3">{card.hint}</p>}
+      {card.hint && card.step !== 4 && !(card.step === 2 && textVal) && <p className="text-[11px] text-[#66736A] mt-3">{card.hint}</p>}
     </motion.div>
   );
 }
@@ -352,7 +355,7 @@ function TimelineSection({ items }:{ items:TimelineItem[] }) {
               </div>
               <p className="text-sm font-semibold text-[#111827] mt-0.5">{it.task}</p>
               {it.description&&<p className="text-xs text-[#6B7280] mt-0.5 leading-relaxed">{it.description}</p>}
-              <p className="text-xs text-[#9CA3AF] mt-0.5">{it.owner}</p>
+              <p className="text-xs text-[#66736A] mt-0.5">{it.owner}</p>
             </div>
           </motion.div>
         );
@@ -375,7 +378,7 @@ function BudgetSection({ items, total }:{ items:BudgetItem[]; total:number }) {
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-sm font-semibold text-[#111827] truncate">{it.category}</span>
                 <span className="text-xs font-bold ml-2 flex-shrink-0" style={{color:p.fg}}>
-                  {formatINR(it.allocated)} <span className="text-[#C4C4C4] font-normal">({pct}%)</span>
+                  {formatINR(it.allocated)} <span className="text-[#66736A] font-normal">({pct}%)</span>
                 </span>
               </div>
               <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
@@ -384,7 +387,7 @@ function BudgetSection({ items, total }:{ items:BudgetItem[]; total:number }) {
                   transition={{duration:0.9,delay:i*0.05,ease:[0.34,1.56,0.64,1]}}/>
               </div>
               {(it as BudgetItem & {notes?:string}).notes && (
-                <p className="text-[10px] text-[#9CA3AF] mt-0.5">{(it as BudgetItem & {notes?:string}).notes}</p>
+                <p className="text-[10px] text-[#66736A] mt-0.5">{(it as BudgetItem & {notes?:string}).notes}</p>
               )}
             </div>
           </motion.div>
@@ -430,7 +433,7 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
                 }}
                 aria-label="City for local vendor search"
                 placeholder="Enter a city"
-                className="h-11 min-w-0 flex-1 border-0 bg-transparent text-sm text-[#202B27] outline-none placeholder:text-[#9CA39D] focus:ring-0"
+                className="h-11 min-w-0 flex-1 border-0 bg-transparent text-sm text-[#202B27] outline-none placeholder:text-[#66736A] focus:ring-0"
               />
             </span>
           </label>
@@ -455,7 +458,7 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-display text-lg font-extrabold text-[#202B27]">Search vendors in {searchedCity}</h3>
-              <p className="mt-0.5 text-xs text-[#778078]">{selectedCategory.label} search links</p>
+              <p className="mt-0.5 text-xs text-[#66736A]">{selectedCategory.label} search links</p>
             </div>
             <span className="rounded-full bg-[#F1F4EF] px-3 py-1.5 text-[10px] font-extrabold text-[#52645A]">No API setup</span>
           </div>
@@ -491,14 +494,14 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-extrabold text-[#202B27]">{link.label}</span>
-                    <span className="mt-0.5 block text-xs text-[#778078]">{link.description}</span>
+                    <span className="mt-0.5 block text-xs text-[#66736A]">{link.description}</span>
                   </span>
                 </span>
                 <ExternalLink size={15} className="shrink-0 text-[#A77D2B] transition-transform group-hover:translate-x-0.5"/>
               </a>
             ))}
             </div>
-          <p className="text-[11px] leading-relaxed text-[#778078]">Search links open external websites. EventMate does not fetch or verify their listings; confirm vendor details directly.</p>
+          <p className="text-[11px] leading-relaxed text-[#66736A]">Search links open external websites. EventMate does not fetch or verify their listings; confirm vendor details directly.</p>
         </>
       )}
     </div>
@@ -525,8 +528,8 @@ function ChecklistSection({ items }:{ items:ChecklistItem[] }) {
               <I size={12} style={{color:p.fg}}/>
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-semibold ${checked?"line-through text-[#9CA3AF]":"text-[#111827]"}`}>{it.task}</p>
-              <p className="text-xs text-[#9CA3AF] mt-0.5">{it.dueDate}</p>
+              <p className={`text-sm font-semibold ${checked?"line-through text-[#66736A]":"text-[#111827]"}`}>{it.task}</p>
+              <p className="text-xs text-[#66736A] mt-0.5">{it.dueDate}</p>
             </div>
           </motion.button>
         );
@@ -628,12 +631,23 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
             {highlights.slice(0,4).map((highlight,index)=>(
               <motion.div key={`${highlight}-${index}`} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:index*0.06}}
                 className="flex min-h-[68px] items-center gap-3 rounded-2xl border border-[#E7E6DE] bg-white px-3.5 py-3 shadow-[0_2px_8px_rgba(27,48,38,0.025)]">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F8F1D9] text-[#A77D2B]"><Sparkles size={14}/></span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F8F1D9] text-[#765D2E]"><Sparkles size={14}/></span>
                 <p className="text-xs font-bold leading-relaxed text-[#34483F]">{highlight}</p>
               </motion.div>
             ))}
           </section>
         )}
+
+        <section aria-label="Guest needs and experience" className="mt-4 grid gap-3 sm:grid-cols-2">
+          <article className="rounded-2xl border border-[#D9E4DA] bg-[#F4F8F3] p-4">
+            <h2 className="text-xs font-extrabold uppercase tracking-wide text-[#315C4C]">Accessibility & dietary needs</h2>
+            <p className="mt-2 text-sm leading-relaxed text-[#34483F]">{plan.accessibilityNeeds || "Not recorded in this saved plan."}</p>
+          </article>
+          <article className="rounded-2xl border border-[#E8DFC5] bg-[#FBF8EE] p-4">
+            <h2 className="text-xs font-extrabold uppercase tracking-wide text-[#765D2E]">Guest age mix</h2>
+            <p className="mt-2 text-sm leading-relaxed text-[#4D493D]">{plan.ageMix || "Not recorded in this saved plan."}</p>
+          </article>
+        </section>
 
         <nav aria-label="Plan sections" className="sticky top-[61px] z-20 mt-6 rounded-2xl border border-[#E6E4DC] bg-white/95 p-1.5 shadow-[0_8px_24px_rgba(27,48,38,0.06)] backdrop-blur">
           <div role="tablist" className="grid grid-cols-4 gap-1">
@@ -642,7 +656,7 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
               return (
                 <button key={id} id={`plan-tab-${id}`} role="tab" aria-selected={active} aria-controls="plan-panel" onClick={()=>setTab(id)}
                   className={`relative flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 text-[11px] font-extrabold transition-colors sm:gap-2 sm:text-xs ${
-                    active?"bg-[#214E43] text-white shadow-sm":"text-[#758078] hover:bg-[#F3F5F0] hover:text-[#315C4C]"
+                    active?"bg-[#214E43] text-white shadow-sm":"text-[#66736A] hover:bg-[#F3F5F0] hover:text-[#315C4C]"
                   }`}>
                   <Icon size={14}/><span>{label}</span>
                 </button>
@@ -656,7 +670,7 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
             <div className="mb-5">
               <p className="text-[10px] font-extrabold uppercase tracking-[0.17em]" style={{color:ep.fg}}>Your plan</p>
               <h2 className="mt-1 font-display text-xl font-extrabold tracking-tight text-[#202B27] sm:text-2xl">{tabCopy[tab].title}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-[#788179]">{tabCopy[tab].description}</p>
+              <p className="mt-1 text-sm leading-relaxed text-[#66736A]">{tabCopy[tab].description}</p>
             </div>
             <AnimatePresence mode="wait">
               {tab==="timeline"  &&<motion.div key="tl" initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0}}><TimelineSection items={plan.timeline}/></motion.div>}
@@ -668,7 +682,7 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
 
           <aside className="space-y-3">
             <div className="rounded-[22px] border border-[#E7E6DE] bg-white p-5 shadow-[0_6px_24px_rgba(27,48,38,0.04)]">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#8A918A]">At a glance</p>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#66736A]">At a glance</p>
               <div className="mt-4 space-y-3">
                 {[
                   {Icon:Clock,label:"Schedule",value:`${plan.timeline.length} moments`},
@@ -679,7 +693,7 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
                   <div key={label} className="flex items-center gap-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#F1F4EF] text-[#315C4C]"><Icon size={14}/></span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold text-[#8A918A]">{label}</p>
+                      <p className="text-[10px] font-semibold text-[#66736A]">{label}</p>
                       <p className="truncate text-xs font-extrabold text-[#34483F]">{value}</p>
                     </div>
                   </div>
@@ -827,13 +841,13 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 id="saved-events-title" className="font-display text-base font-extrabold text-[#202B27]">My saved events</h2>
-                <p className="mt-0.5 text-xs text-[#778078]">Your plans are saved to your account.</p>
+                <p className="mt-0.5 text-xs text-[#66736A]">Your plans are saved to your account.</p>
               </div>
               <span className="rounded-full bg-[#F1F4EF] px-3 py-1 text-[10px] font-extrabold text-[#52645A]">{events.length} saved</span>
             </div>
             {eventsError && <p role="alert" className="mt-3 text-xs text-[#9A4938]">{eventsError}</p>}
             {eventsLoading ? (
-              <p className="mt-4 text-xs text-[#778078]">Loading your events…</p>
+              <p className="mt-4 text-xs text-[#66736A]">Loading your events…</p>
             ) : events.length ? (
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {events.map((event) => (
@@ -841,12 +855,12 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
                     className="rounded-xl border border-[#E7E4DB] bg-[#FFFEFA] p-3 text-left transition hover:border-[#B9C9BD] hover:bg-[#F7F9F5]">
                     <span className="block font-display text-sm font-extrabold capitalize text-[#214E43]">{event.eventType}</span>
                     <span className="mt-1 block text-xs text-[#68736D]">{[event.city, event.eventDate].filter(Boolean).join(" · ")}</span>
-                    <span className="mt-2 block text-[10px] font-bold text-[#A77D2B]">Version {event.version} · {formatINR(event.budgetTotal)}</span>
+                    <span className="mt-2 block text-[10px] font-bold text-[#765D2E]">Version {event.version} · {formatINR(event.budgetTotal)}</span>
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="mt-4 text-xs text-[#778078]">Your first event plan will appear here. Start planning whenever you&apos;re ready.</p>
+              <p className="mt-4 text-xs text-[#66736A]">Your first event plan will appear here. Start planning whenever you&apos;re ready.</p>
             )}
           </div>
         </section>
@@ -887,7 +901,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
                   <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#F6C65B] text-[#214E43]"><Wand2 size={18}/></span>
                   <span className="min-w-0">
                     <span className="block text-sm font-extrabold">Build my event plan</span>
-                    <span className="mt-0.5 block text-[11px] font-medium text-white/75">A thoughtful plan, saved to your account.</span>
+                    <span className="mt-0.5 block text-[11px] font-medium text-white/75">Start right away; sign in when you want plans linked to your account.</span>
                   </span>
                 </span>
                 <ArrowRight size={18} className="flex-shrink-0 text-[#F6C65B] transition-transform group-hover:translate-x-1"/>
@@ -905,7 +919,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
           <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.22}}
             className="flex flex-wrap gap-x-6 gap-y-3 justify-center lg:justify-start">
             {[
-              {n:"10",    l:"tailored questions", c:"#315C4C", s:"#CBD5CC"},
+              {n:"12",    l:"tailored questions", c:"#315C4C", s:"#CBD5CC"},
               {n:"< 2 min",l:"to your plan",    c:"#D9684E", s:"#F1C5B9"},
               {n:"Saved", l:"to your account", c:"#B27A18", s:"#EED9A7"},
             ].map(({n,l,c,s},i)=>(
@@ -940,12 +954,12 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
             className="absolute left-[8%] top-[25%] z-20 w-[34%] sm:top-[27%] sm:w-[32%] text-[#F8F7F2]">
             <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#F6C65B] sm:text-[10px]">{moments[activeMoment].time}</p>
             <p className="mt-1 text-sm font-extrabold leading-tight sm:text-lg">{moments[activeMoment].label}</p>
-            <p className="mt-1 text-[10px] leading-snug text-white/70 sm:text-xs">{moments[activeMoment].detail}</p>
+            <p className="mt-1 text-[10px] leading-snug text-white/90 sm:text-xs">{moments[activeMoment].detail}</p>
           </motion.div>
           <div className="absolute inset-x-0 bottom-0 z-20 grid min-h-[76px] grid-cols-3 border-t border-white/15 bg-[#173D34] px-2 py-2 sm:min-h-[88px] sm:px-5 sm:py-3">
             {moments.map(({time,label},index)=>(
               <button key={time} type="button" onClick={()=>selectMoment(index)} aria-pressed={activeMoment===index}
-                className={`group relative min-w-0 px-2 text-left transition-colors sm:px-3 ${index===1?"border-x border-white/15":""} ${activeMoment===index?"text-white":"text-white/55 hover:text-white/85"}`}>
+                className={`group relative min-w-0 px-2 text-left transition-colors sm:px-3 ${index===1?"border-x border-white/15":""} ${activeMoment===index?"text-white":"text-white/90 hover:text-white"}`}>
                 <span className={`absolute inset-x-2 top-[-9px] h-[2px] transition-colors sm:inset-x-3 sm:top-[-13px] ${activeMoment===index?"bg-[#F6C65B]":"bg-transparent group-hover:bg-white/40"}`}/>
                 <span className="block text-[9px] font-bold text-[#F6C65B] sm:text-[10px]">{time}</span>
                 <span className="mt-1 block truncate text-[10px] font-bold sm:text-xs">{label}</span>
@@ -974,7 +988,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{background:`${shadow.replace("0.45","0.12")}`}}>
                   <I size={20} style={{color:shadow.replace("0.45","1")}}/>
                 </div>
-                <span className="flex items-center justify-between w-full">{label}{selectedEvent?.type===type?<Check size={15} className="text-[#315C4C]"/>:<ArrowRight size={14} className="text-[#89938C]"/>}</span>
+                <span className="flex items-center justify-between w-full">{label}{selectedEvent?.type===type?<Check size={15} className="text-[#315C4C]"/>:<ArrowRight size={14} className="text-[#66736A]"/>}</span>
               </motion.button>
             ))}
           </div>
@@ -997,13 +1011,13 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
             className="overflow-hidden border border-[#DADDD2] bg-[#FBFAF6] shadow-[0_22px_55px_rgba(38,52,43,0.08)]">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E7E6DD] px-4 py-4 sm:px-7">
               <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#89938C]">A little preview</p>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#66736A]">A little preview</p>
                 <p className="mt-1 font-display text-base font-extrabold text-[#202B27]">{selectedEvent?`${selectedEvent.label} in Jaipur`:"A celebration in Jaipur"}</p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="hidden items-center gap-2 text-[10px] font-bold text-[#315C4C] sm:inline-flex sm:text-xs"><span className="h-2 w-2 rounded-full bg-[#6EAD7B]"/>Your plan, ready to make yours</span>
                 <button type="button" onClick={()=>onStart(selectedEvent?.type,selectedEvent?.label)} disabled={!selectedEvent}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#214E43] px-3 py-2 text-[10px] font-extrabold text-white transition-colors hover:bg-[#173D34] disabled:cursor-not-allowed disabled:bg-[#DADDD2] disabled:text-[#89938C] sm:px-4 sm:text-xs">
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#214E43] px-3 py-2 text-[10px] font-extrabold text-white transition-colors hover:bg-[#173D34] disabled:cursor-not-allowed disabled:bg-[#DADDD2] disabled:text-[#66736A] sm:px-4 sm:text-xs">
                   {selectedEvent?`Plan my ${selectedEvent.label}`:"Choose an event"}<ArrowRight size={13}/>
                 </button>
               </div>
@@ -1013,7 +1027,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
               <div className="px-4 py-6 sm:px-7 sm:py-8">
                 <div className="mb-5 flex items-center justify-between gap-3">
                   <h3 className="font-display text-sm font-extrabold text-[#202B27] sm:text-base">The day, at a glance</h3>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#89938C]">Saturday · 12 October</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#66736A]">Saturday · 12 October</span>
                 </div>
                 <div className="space-y-0">
                   {[
@@ -1029,7 +1043,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
                       </div>
                       <div className="pb-5">
                         <p className="text-xs font-extrabold text-[#202B27] sm:text-sm">{task}</p>
-                        <p className="mt-1 text-[10px] text-[#89938C] sm:text-xs">{who}</p>
+                        <p className="mt-1 text-[10px] text-[#66736A] sm:text-xs">{who}</p>
                       </div>
                     </div>
                   ))}
@@ -1040,7 +1054,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="font-display text-sm font-extrabold text-[#202B27] sm:text-base">Budget at a glance</h3>
-                    <p className="mt-1 text-[10px] text-[#89938C] sm:text-xs">Thoughtfully split across the essentials</p>
+                    <p className="mt-1 text-[10px] text-[#66736A] sm:text-xs">Thoughtfully split across the essentials</p>
                   </div>
                   <span className="font-display text-lg font-extrabold text-[#315C4C] sm:text-xl">₹8.5L</span>
                 </div>
@@ -1131,10 +1145,11 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
   const [answers, setAnswers]           = useState<AnswerEntry[]>(()=>initialType?[{step:1,display:initialLabel??initialType,raw:initialType}]:[]);
   const [collectedData, setCollected]   = useState<EventCollectedData>({
     eventType: initialType ?? null, eventDate: null, guestCount: null, city: null,
-    budgetTotal: null, theme: null, venueStyle: null, cateringType: null, specialRequirements: null, eventDetails: {},
+    budgetTotal: null, accessibilityNeeds: null, ageMix: null, theme: null, venueStyle: null, cateringType: null, specialRequirements: null, eventDetails: {},
   });
   const [isLoading, setIsLoading]       = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [readyToGen, setReadyToGen]     = useState(false);
   const [generationError, setGenerationError] = useState("");
   const [plan, setPlan]                 = useState<EventPlan|null>(null);
@@ -1165,6 +1180,15 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
     else if (readyToGen) setMood("celebrate");
     else setMood("greet");
   },[isLoading,isGenerating,readyToGen,setMood]);
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setIsRetrying(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsRetrying(true), 3500);
+    return () => clearTimeout(timer);
+  },[isGenerating]);
 
   // Initial call
   useEffect(()=>{
@@ -1241,13 +1265,11 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
         body:JSON.stringify({messages:history,generatePlan:true,planData:collectedData})});
       const payload = await res.json().catch(() => ({})) as {
         error?:string;
-        detail?:string;
         plan?:RunPlan;
         run?:{eventId:string;organizerToken:string;version:number;ownerLinks:{owner:string;token:string;taskIds:string[];expiresAt:string}[]};
       };
       if (!res.ok) {
-        const message = payload.error ?? "Unable to generate the plan.";
-        throw new Error(payload.detail ? `${message} (${payload.detail})` : message);
+        throw new Error(payload.error ?? "Unable to generate the plan. Please retry.");
       }
       if (!payload.plan || !payload.run?.eventId || !payload.run.organizerToken) {
         throw new Error("The server returned an incomplete plan. Your answers are saved; please retry.");
@@ -1314,7 +1336,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
                 <h2 className="mt-1 font-display text-lg font-extrabold leading-tight text-[#FFFDF7] sm:text-xl">From idea to occasion</h2>
               </div>
               <div className="text-right">
-                <p className="font-display text-2xl font-extrabold leading-none text-[#F4D991]">{String(answers.length).padStart(2,"0")}<span className="text-sm text-white/45"> / {String(totalQuestions).padStart(2,"0")}</span></p>
+                <p className="font-display text-2xl font-extrabold leading-none text-[#F4D991]">{String(answers.length).padStart(2,"0")}                <span className="text-sm text-white/75"> / {String(totalQuestions).padStart(2,"0")}</span></p>
                 <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#D8E5DC]">details gathered</p>
               </div>
             </div>
@@ -1326,7 +1348,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
           <div className="relative flex-1 px-5 py-4 sm:px-7 lg:px-7 lg:py-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#68796F]">The planning arc</p>
+                <p className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#66736A]">The planning arc</p>
                 <p className="mt-1 text-xs text-[#52645A]">One thoughtful detail at a time</p>
               </div>
               <Sparkles size={16} className="text-[#A77D2B]"/>
@@ -1342,12 +1364,12 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
                   return (
                     <motion.div key={question.key} initial={answer?{opacity:0,x:-8}:false} animate={{opacity:1,x:0}} exit={{opacity:0}}
                       className={`relative flex min-h-8 items-center gap-2.5 rounded-md px-1.5 py-1 ${answer||isCurrent?"flex":"hidden lg:flex"} ${isCurrent?"bg-white shadow-[0_2px_8px_rgba(43,54,44,0.06)] ring-1 ring-[#E5DFCE]":""}`}>
-                      <span className={`relative z-10 flex h-[23px] w-[23px] flex-shrink-0 items-center justify-center rounded-full border bg-[#F5F2E9] ${answer?"border-[#547761] text-[#41654D]":isCurrent?"border-[#B58B38] text-[#A57C2F]":"border-[#DAD7CB] text-[#929B90]"}`}>
+                      <span className={`relative z-10 flex h-[23px] w-[23px] flex-shrink-0 items-center justify-center rounded-full border bg-[#F5F2E9] ${answer?"border-[#547761] text-[#41654D]":isCurrent?"border-[#B58B38] text-[#765D2E]":"border-[#DAD7CB] text-[#929B90]"}`}>
                         {answer?<Check size={11} strokeWidth={3}/>:<Icon size={10}/>}
                       </span>
                       <span className={`min-w-0 flex-1 truncate text-[11px] ${answer?"font-bold text-[#33463B]":isCurrent?"font-extrabold text-[#344B3B]":"font-medium text-[#788278]"}`}>{answer?.display??question.label}</span>
-                      {isCurrent&&<span className="flex-shrink-0 text-[8px] font-extrabold uppercase tracking-[0.14em] text-[#A57C2F]">Now</span>}
-                      {answer&&<span className="flex-shrink-0 font-display text-[8px] font-bold text-[#B58B38]">{String(question.step).padStart(2,"0")}</span>}
+                      {isCurrent&&<span className="flex-shrink-0 text-[8px] font-extrabold uppercase tracking-[0.14em] text-[#765D2E]">Now</span>}
+                      {answer&&<span className="flex-shrink-0 font-display text-[8px] font-bold text-[#765D2E]">{String(question.step).padStart(2,"0")}</span>}
                     </motion.div>
                   );
                 })}
@@ -1362,7 +1384,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="font-display text-xs font-extrabold text-[#263B32]">Eve <span className="font-normal text-[#89938C]">· your host</span></p>
+                <p className="font-display text-xs font-extrabold text-[#263B32]">Eve <span className="font-normal text-[#66736A]">· your host</span></p>
                 <span className="flex-shrink-0 text-[8px] font-bold uppercase tracking-wider text-[#7F8F7F]">{isLoading?"Thinking":isGenerating?"Planning":readyToGen?"Ready":"With you"}</span>
               </div>
             </div>
@@ -1378,7 +1400,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
             </div>
           )}
 
-          <div className="w-full max-w-lg">
+          <div className="w-full max-w-lg" aria-live="polite" aria-busy={isLoading || isGenerating}>
             <AnimatePresence mode="wait">
               {isLoading&&!currentCard&&(
                 <motion.div key="loading" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
@@ -1390,7 +1412,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
                         transition={{duration:0.7,repeat:Infinity,delay:i*0.15}}/>
                     ))}
                   </div>
-                  <p className="text-sm text-[#9CA3AF] font-medium">Eve is thinking…</p>
+                  <p className="text-sm text-[#66736A] font-medium">Eve is thinking…</p>
                 </motion.div>
               )}
 
@@ -1413,6 +1435,9 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
                   <div className="mt-5">
                     <p className="font-display text-xl font-extrabold text-[#263B32]">{currentGenerationCopy.heading}</p>
                     <p className="mt-1 text-sm text-[#788278]">Eve is shaping the details around your {collectedData.eventType === "corporate" ? "business event" : collectedData.eventType === "other" ? "gathering" : collectedData.eventType ?? "event"}.</p>
+                    <p role="status" aria-live="polite" className="mt-2 text-xs font-semibold text-[#765D2E]">
+                      {isRetrying ? "AI is busy, retrying with the backup model…" : "Eve is preparing your plan…"}
+                    </p>
                   </div>
                   <div className="mt-6 flex w-full max-w-[280px] items-center justify-between gap-2 text-[9px] font-bold text-[#68756B]">
                     {currentGenerationCopy.stages.map((label,index)=>(
@@ -1439,7 +1464,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
                   </motion.div>
                   <div>
                     <p className="text-2xl font-extrabold text-[#111827] font-display">All set!</p>
-                    <p className="text-sm text-[#9CA3AF] mt-1">I have everything I need.</p>
+                    <p className="text-sm text-[#66736A] mt-1">I have everything I need.</p>
                   </div>
                   {generationError&&<p role="alert" className="max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-800">{generationError} Your answers are still here—retry when ready.</p>}
                   <motion.button onClick={handleGenerate}
@@ -1475,7 +1500,6 @@ export default function App() {
   const [account, setAccount] = useState<AccountUser|null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
-  const [pendingStart, setPendingStart] = useState<{type?:string;label?:string}|null>(null);
   const [savedEvents, setSavedEvents] = useState<SavedEventSummary[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState("");
@@ -1491,8 +1515,7 @@ export default function App() {
         const user = data?.user;
         if (active && user) setAccount({ id: user.id, email: user.email, name: user.name });
       })
-      .catch((error: unknown) => {
-        console.error("[auth] Unable to restore the current session.", error);
+      .catch(() => {
         if (active) setEventsError("We couldn't check your sign-in status. Please refresh and try again.");
       })
       .finally(() => { if (active) setAuthLoading(false); });
@@ -1525,26 +1548,14 @@ export default function App() {
   }, [account, refreshSavedEvents]);
 
   const handleStart = useCallback((type?:string, label?:string)=>{
-    if (authLoading) return;
-    if (!account) {
-      setPendingStart({type,label});
-      setAuthDialogOpen(true);
-      return;
-    }
     setInitType(type);
     setInitLabel(label);
     setScreen("studio");
-  },[account,authLoading]);
+  },[]);
 
   const handleAuthenticated = (user: AccountUser) => {
     setAccount(user);
     setAuthDialogOpen(false);
-    if (pendingStart) {
-      setInitType(pendingStart.type);
-      setInitLabel(pendingStart.label);
-      setScreen("studio");
-      setPendingStart(null);
-    }
   };
 
   const handleSignOut = async () => {
@@ -1609,7 +1620,7 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      {authDialogOpen && <AuthDialog onClose={() => { setAuthDialogOpen(false); setPendingStart(null); }} onAuthenticated={handleAuthenticated}/>}
+      {authDialogOpen && <AuthDialog onClose={() => setAuthDialogOpen(false)} onAuthenticated={handleAuthenticated}/>}
     </>
   );
 }

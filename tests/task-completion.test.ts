@@ -47,6 +47,8 @@ function makePlan(): RunPlan {
     guestCount: 100,
     city: "Pune",
     budgetTotal: 100000,
+    accessibilityNeeds: "Wheelchair access",
+    ageMix: "A mix of ages",
     timeline: [task],
     budgetBreakdown: [],
     vendors: [],
