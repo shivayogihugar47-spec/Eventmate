@@ -190,6 +190,67 @@ describe("RUN change intake", () => {
 
     expect(changes.changes.map((change) => change.type)).toEqual(["DELAY", "GUEST_COUNT"]);
   });
+
+  it("asks for the missing duration instead of returning an invalid request for 'Caterer is hours late'", async () => {
+    const result = await parseChangeText(
+      "Caterer is hours late",
+      makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]),
+    );
+
+    expect(result).toEqual({
+      changes: [],
+      clarifyingQuestion: "How many minutes late is Caterer?",
+    });
+    expect(mocks.llmJson).not.toHaveBeenCalled();
+  });
+
+  it("returns an HTTP clarification response for an unspecified delay", async () => {
+    const eventId = "00000000-0000-4000-8000-000000000099";
+    mocks.consumeRateLimit.mockResolvedValue(true);
+    mocks.rateLimitIdentity.mockReturnValue("test-client");
+    mocks.loadOrganizerRun.mockResolvedValue({
+      eventId,
+      version: 1,
+      plan: makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]),
+      answers: {},
+      organizerToken: "test-token",
+    });
+    mocks.sql.mockResolvedValue([]);
+
+    const response = await intakePost(
+      new Request(`https://eventmate.test/api/run/${eventId}/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: 1, text: "Caterer is hours late" }),
+      }),
+      { params: { eventId } },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      clarifyingQuestion: "How many minutes late is Caterer?",
+    });
+    expect(mocks.llmJson).not.toHaveBeenCalled();
+  });
+
+  it("asks one clarification when the model returns invalid structured change data", async () => {
+    const { z } = await import("zod");
+    mocks.llmJson.mockRejectedValue(new z.ZodError([{
+      code: "invalid_type",
+      expected: "number",
+      received: "string",
+      path: ["changes", 0, "minutes"],
+      message: "Expected number, received string",
+    }] as never));
+
+    const result = await parseChangeText(
+      "Caterer is 1 hour late",
+      makePlan([makeTask(ids.caterer, "Catering setup", "2026-10-10T09:30:00.000Z", 30)]),
+    );
+
+    expect(result.changes).toEqual([]);
+    expect(result.clarifyingQuestion).toBe("I couldn't read that update clearly. Which task changed, and what is the new time or amount?");
+  });
 });
 
 describe("RUN risk generation fallback", () => {

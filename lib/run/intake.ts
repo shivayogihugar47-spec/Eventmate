@@ -56,18 +56,41 @@ export async function parseChangeText(text: string, plan: RunPlan): Promise<{
   if (!trimmed) throw new Error("Tell Eve what changed before submitting.");
   if (trimmed.length > 1200) throw new Error("Keep the update under 1,200 characters.");
 
-  const parsed = await llmJson(
-    `Convert the organizer's message into zero or more independent Change objects. ` +
-      `Use only these types: DELAY, VENDOR_CANCELLED, VENDOR_REPLACED, GUEST_COUNT, BUDGET, DATE_MOVE, VENUE_ISSUE, WEATHER, TASK_DONE. ` +
-      `A message may contain several changes. Match tasks/vendors to the supplied plan and use taskId when unambiguous. ` +
-      `Convert times/durations to minutes, money to INR integer, dates to YYYY-MM-DD, venue closing time to HH:mm. ` +
-      `If any requested change is ambiguous, ask exactly one concise clarifying question and return no changes. ` +
-      `Do not invent values; do not make a plan or suggest actions.`,
-    [
-      { role: "user", content: `Event plan:\n${JSON.stringify(plan)}\n\nOrganizer update:\n${trimmed}` },
-    ],
-    IntakeSchema,
-  );
+  const mentionsDelay = /\b(?:late|delayed|running behind|behind schedule)\b/i.test(trimmed);
+  const includesDuration = /\b\d+(?:\.\d+)?\s*(?:minutes?|mins?|hours?|hrs?)\b/i.test(trimmed);
+  if (mentionsDelay && !includesDuration) {
+    const subjectMatch = trimmed.match(/\b(.{1,60}?)\s+(?:is|are|was|were|will be)\s+(?:hours?|late|delayed|running behind)\b/i);
+    const subject = subjectMatch?.[1].replace(/^(?:the|our|my)\s+/i, "").trim();
+    return {
+      changes: [],
+      clarifyingQuestion: subject
+        ? `How many minutes late is ${subject}?`
+        : "Which task is delayed, and by how many minutes?",
+    };
+  }
+
+  let parsed: z.infer<typeof IntakeSchema>;
+  try {
+    parsed = await llmJson(
+      `Convert the organizer's message into zero or more independent Change objects. ` +
+        `Use only these types: DELAY, VENDOR_CANCELLED, VENDOR_REPLACED, GUEST_COUNT, BUDGET, DATE_MOVE, VENUE_ISSUE, WEATHER, TASK_DONE. ` +
+        `A message may contain several changes. Match tasks/vendors to the supplied plan and use taskId when unambiguous. ` +
+        `Convert times/durations to minutes, money to INR integer, dates to YYYY-MM-DD, venue closing time to HH:mm. ` +
+        `If any requested change is ambiguous, ask exactly one concise clarifying question and return no changes. ` +
+        `Do not invent values; do not make a plan or suggest actions.`,
+      [
+        { role: "user", content: `Event plan:\n${JSON.stringify(plan)}\n\nOrganizer update:\n${trimmed}` },
+      ],
+      IntakeSchema,
+    );
+  } catch (error) {
+    if (!(error instanceof z.ZodError)) throw error;
+    console.warn("[RUN intake] LLM returned changes that failed validation; asking organizer to clarify.", error.issues);
+    return {
+      changes: [],
+      clarifyingQuestion: "I couldn't read that update clearly. Which task changed, and what is the new time or amount?",
+    };
+  }
 
   const changes = parsed.changes.map((change) => ChangeSchema.parse(change));
   validateChangeTargets(changes, plan);
