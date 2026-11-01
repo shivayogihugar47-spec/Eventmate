@@ -11,7 +11,7 @@ import { Diya } from "./Diya";
 import { DiyaJourneyStepper } from "./DiyaJourneyStepper";
 import { useDiya } from "@/lib/diyaStore";
 import { useLiveEvent, type RunSnapshot } from "@/lib/useLiveEvent";
-import type { RunChange, RunOperation, RunPlan } from "@/lib/run/types";
+import { isSyntheticFallbackRisk, type RunChange, type RunOperation, type RunPlan } from "@/lib/run/types";
 
 interface OwnerMessage {
   taskId: string;
@@ -35,6 +35,13 @@ interface ProposalView {
   impact: { severity: "low" | "medium" | "high" };
   options: RunOptionView[];
   idempotencyKey: string;
+}
+
+interface ManualPlanB {
+  title: string;
+  summary: string;
+  steps: string[];
+  blockers: string[];
 }
 
 interface QueuedChange {
@@ -110,7 +117,7 @@ function backupActionText(operation: RunOperation, plan: RunPlan): string {
 
 function auditText(entry: RunSnapshot["audit"][number]): string {
   const payload = entry.payload ?? {};
-  if (entry.type === "LOCKED") return "The event plan was locked with five prepared contingencies.";
+  if (entry.type === "LOCKED") return "The event plan was locked with its generated contingencies.";
   if (entry.type === "APPLIED") return `Applied ${String(payload.note ?? "a verified event update")} (version ${String(payload.version ?? "")}).`;
   if (entry.type === "NOTIFY") return "WhatsApp-ready updates were prepared for affected task owners.";
   if (entry.type === "NOTIFY_FAILED") return "The change was applied; owner message drafting needs a retry.";
@@ -121,8 +128,16 @@ function auditText(entry: RunSnapshot["audit"][number]): string {
 }
 
 async function readJson<T>(response: Response): Promise<T & { error?: string }> {
-  const value = await response.json() as T & { error?: string };
-  if (!response.ok) throw new Error(value.error ?? `Request failed (${response.status}).`);
+  const value = await response.json() as T & { error?: string; reasons?: string[] };
+  if (!response.ok) {
+    const reasons = Array.isArray(value.reasons)
+      ? value.reasons
+        .filter((reason): reason is string => typeof reason === "string")
+        .slice(0, 3)
+        .map((reason) => reason.slice(0, 240))
+      : [];
+    throw new Error([value.error ?? `Request failed (${response.status}).`, ...reasons].join(" "));
+  }
   return value;
 }
 
@@ -132,6 +147,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
   const { say, setMood } = useDiya();
   const [input, setInput] = useState("");
   const [proposal, setProposal] = useState<ProposalView | null>(null);
+  const [manualPlanB, setManualPlanB] = useState<ManualPlanB | null>(null);
   const [optimisticPlan, setOptimisticPlan] = useState<RunPlan | null>(null);
   const [notifications, setNotifications] = useState<OwnerMessage[]>([]);
   const [notificationRetry, setNotificationRetry] = useState<{ changes: RunChange[]; taskIds: string[]; version: number } | null>(null);
@@ -231,6 +247,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
     }
     setBusy(true);
     setError("");
+    setManualPlanB(null);
     try {
       const response = await fetch(`/api/run/${eventId}/intake`, {
         method: "POST",
@@ -243,7 +260,11 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
           idempotencyKey: change.id,
         }),
       });
-      const result = await readJson<ProposalView & { clarifyingQuestion?: string; completedTask?: boolean }>(response);
+      const result = await readJson<ProposalView & {
+        clarifyingQuestion?: string;
+        completedTask?: boolean;
+        manualPlanB?: ManualPlanB;
+      }>(response);
       if (result.completedTask) {
         if (removeFromQueue) setQueued((existing) => existing.filter((entry) => entry.id !== change.id));
         await refresh();
@@ -252,6 +273,11 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
       }
       if (result.clarifyingQuestion) {
         setError(result.clarifyingQuestion);
+        if (removeFromQueue) setQueued((existing) => existing.filter((entry) => entry.id !== change.id));
+        return;
+      }
+      if (result.manualPlanB) {
+        setManualPlanB(result.manualPlanB);
         if (removeFromQueue) setQueued((existing) => existing.filter((entry) => entry.id !== change.id));
         return;
       }
@@ -358,6 +384,24 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
     }
   };
 
+  const generatePlanB = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/run/${eventId}/risks`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${organizerToken}` },
+      });
+      await readJson<{ risks: RunSnapshot["risks"] }>(response);
+      await refresh();
+      say("Event-specific Plan B options are ready.", "greet", 2600);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to generate event-specific Plan B options. Please retry.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const loadSummary = async () => {
     setBusy(true);
     setError("");
@@ -395,7 +439,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
   const quickAction = (action: string, taskId?: string) => void submitChange({ id: crypto.randomUUID(), action, taskId });
   const audit = [...(snapshot?.audit ?? [])].reverse();
   const ownerLinks = snapshot?.ownerLinks ?? [];
-  const riskList = snapshot?.risks ?? [];
+  const riskList = (snapshot?.risks ?? []).filter((risk) => !isSyntheticFallbackRisk(risk));
 
   return (
     <div className="min-h-screen bg-[#F4F2EB] text-[#1E332B]">
@@ -427,6 +471,24 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
           <span>{error}</span>
           {error.includes("Retry notifications") && <button onClick={() => void retryNotifications()} className="shrink-0 rounded-lg border border-[#E5B9AF] px-3 py-1.5 text-xs font-bold"><RefreshCw size={12} className="mr-1 inline"/>Retry</button>}
         </div>}
+        {manualPlanB && <section role="status" className="mt-4 rounded-2xl border border-[#DCCB9D] bg-[#FFFEFA] px-4 py-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-[#92702D]"/>
+            <div className="min-w-0">
+              <h2 className="text-sm font-extrabold text-[#34483F]">{manualPlanB.title}</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[#596A60]">{manualPlanB.summary}</p>
+              <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-[#34483F]">
+                {manualPlanB.steps.map((step) => <li key={step}>{step}</li>)}
+              </ol>
+              {manualPlanB.blockers.length > 0 && <details className="mt-3 text-[11px] text-[#66736A]">
+                <summary className="cursor-pointer font-bold">View safety checks</summary>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {manualPlanB.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                </ul>
+              </details>}
+            </div>
+          </div>
+        </section>}
 
         <section className="relative mt-6 overflow-hidden rounded-[30px] bg-[#143E33] p-5 text-white shadow-[0_20px_60px_rgba(27,65,52,0.16)] sm:p-8">
           <div className="pointer-events-none absolute -right-20 -top-32 h-80 w-80 rounded-full bg-[#E9BF68]/10 blur-3xl"/>
@@ -589,16 +651,21 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
 
             <section id="plan-b" className="scroll-mt-32 rounded-[26px] border border-[#E5E2D9] bg-white p-4 shadow-[0_8px_26px_rgba(31,53,43,0.035)] sm:p-5">
               <div className="flex items-start justify-between gap-3">
-                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">03 · Prepared contingencies</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Plan B is ready</h2></div>
+                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">03 · Event-specific contingencies</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Plan B</h2></div>
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F7F0DA] text-[#92702D]"><ShieldCheck size={16}/></span>
               </div>
-              <p className="mt-1 text-[10px] leading-relaxed text-[#66736A]">When a risk happens, Eve surfaces the prepared response before generating new options.</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-[#66736A]">Contingencies are generated from this event’s actual tasks and constraints. Vendor availability is not assumed.</p>
               <div className="mt-3 space-y-2">
                 {riskList.slice(0,4).map((risk)=><article key={risk.id??risk.title} className="rounded-xl border border-[#EFEEE8] bg-[#FBFAF7] p-3">
                   <div className="flex items-start justify-between gap-2"><div><p className="text-[11px] font-extrabold text-[#34483F]">{risk.title}</p><p className="mt-1 text-[9px] font-semibold capitalize text-[#849087]">{risk.triggerType.replaceAll("_"," ").toLowerCase()} · {risk.likelihood} likelihood</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-extrabold uppercase ${risk.status==="triggered"?"bg-[#FFF0D6] text-[#936421]":"bg-[#E9F2E9] text-[#3E7250]"}`}>{risk.status??"ready"}</span></div>
                   {risk.backupAction.length>0&&<p className="mt-2 border-t border-[#EAE8E0] pt-2 text-[9px] font-semibold leading-relaxed text-[#596A60]">Prepared response · {risk.backupAction.map((operation)=>backupActionText(operation,plan)).join(" · ")}</p>}
                 </article>)}
-                {riskList.length===0&&<p className="rounded-xl bg-[#FBFAF7] p-3 text-[10px] text-[#849087]">{isLoading?"Loading event contingencies…":"No prepared contingencies were found for this event."}</p>}
+                {riskList.length===0&&<div className="rounded-xl bg-[#FBFAF7] p-3">
+                  <p className="text-[10px] text-[#66736A]">{isLoading?"Loading event contingencies…":"No event-specific contingencies are saved for this event yet."}</p>
+                  {!isLoading&&<button disabled={busy} onClick={()=>void generatePlanB()} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#17483B] px-3 py-2 text-[10px] font-extrabold text-white transition hover:bg-[#10392E] disabled:cursor-not-allowed disabled:opacity-50">
+                    {busy?<><RefreshCw size={12} className="animate-spin"/>Generating from this plan…</>:<>Generate real Plan B<Sparkles size={12}/></>}
+                  </button>}
+                </div>}
               </div>
             </section>
 

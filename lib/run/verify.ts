@@ -56,6 +56,32 @@ export function verifyOptions(
   return { verified, failures };
 }
 
+function dependencyRoots(plan: RunPlan, taskId: string): string[] {
+  const tasksById = new Map(plan.timeline.map((task) => [task.id, task]));
+  const roots = new Set<string>();
+  const visited = new Set<string>();
+
+  const visit = (id: string) => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    const task = tasksById.get(id);
+    if (!task) return;
+    const dependencies = task.dependsOn
+      .map((dependencyId) => tasksById.get(dependencyId))
+      .filter((dependency): dependency is RunPlan["timeline"][number] =>
+        Boolean(dependency && dependency.status !== "cancelled"),
+      );
+    if (dependencies.length === 0) {
+      roots.add(task.id);
+      return;
+    }
+    dependencies.forEach((dependency) => visit(dependency.id));
+  };
+
+  visit(taskId);
+  return Array.from(roots);
+}
+
 export function deterministicShiftOption(
   currentPlan: RunPlan,
   changes: RunChange[],
@@ -79,7 +105,10 @@ export function deterministicShiftOption(
       deadline = Date.parse(`${changedPlan.eventDate}T${close}:00Z`);
     }
     if (!Number.isFinite(deadline)) return null;
-    shiftByTask.set(task.id, Math.min(shiftByTask.get(task.id) ?? 0, -Math.ceil((end - deadline) / 60_000)));
+    const shift = -Math.ceil((end - deadline) / 60_000);
+    for (const rootId of dependencyRoots(changedPlan, task.id)) {
+      shiftByTask.set(rootId, Math.min(shiftByTask.get(rootId) ?? 0, shift));
+    }
   }
 
   if (shiftByTask.size === 0) {
@@ -88,15 +117,20 @@ export function deterministicShiftOption(
     const task = changedPlan.timeline.find((entry) => entry.id === delayed.taskId);
     if (!task) return null;
     const slack = impact.slackMinutes[task.id] ?? 0;
-    shiftByTask.set(task.id, -Math.min(delayed.minutes ?? 15, slack));
+    const shift = -Math.min(delayed.minutes ?? 15, slack);
+    for (const rootId of dependencyRoots(changedPlan, task.id)) {
+      shiftByTask.set(rootId, Math.min(shiftByTask.get(rootId) ?? 0, shift));
+    }
   }
 
   const operations = Array.from(shiftByTask, ([taskId, minutes]) => ({ type: "shift" as const, taskId, minutes }));
   if (operations.every((operation) => operation.minutes === 0)) return null;
+  const candidate = applyOperations(changedPlan, operations);
+  if (detectViolations(candidate).length > 0) return null;
   return {
-    title: "Minimal schedule adjustment",
+    title: "Dependency-safe schedule adjustment",
     operations,
-    tradeoffs: ["Moves only the affected schedule earlier; no vendor or budget changes."],
+    tradeoffs: ["Moves the affected task chain earlier while preserving its dependencies; no vendor or budget changes."],
     rupeeImpact: 0,
     source: "deterministic",
   };

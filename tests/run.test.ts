@@ -27,7 +27,8 @@ import { parseChangeText } from "@/lib/run/intake";
 import { generateOptions } from "@/lib/run/options";
 import { generateRisks } from "@/lib/run/risks";
 import { applySelectedProposal, revertToPreviousVersion } from "@/lib/run/apply";
-import { verifyOptions } from "@/lib/run/verify";
+import { deterministicShiftOption, verifyOptions } from "@/lib/run/verify";
+import { isSyntheticFallbackRisk } from "@/lib/run/types";
 import { POST as intakePost } from "@/app/api/run/[eventId]/intake/route";
 import { POST as commentPost } from "@/app/api/comment/route";
 import type { RunPlan, RunTask } from "@/lib/run/types";
@@ -173,6 +174,33 @@ describe("RUN impact and verification", () => {
     expect(result.verified).toHaveLength(0);
     expect(result.failures.join(" ")).toContain("event end");
   });
+
+  it("moves a dependency chain together when recovering from a hard event-end violation", () => {
+    const cleanupId = ids.setup;
+    const wrapUpId = ids.caterer;
+    const plan = makePlan([
+      makeTask(cleanupId, "Venue cleanup", "2026-10-10T09:00:00.000Z", 30),
+      makeTask(wrapUpId, "Event wrap-up", "2026-10-10T09:30:00.000Z", 30, [cleanupId]),
+    ]);
+    plan.constraints = { eventEndsAt: "2026-10-10T10:00:00.000Z" };
+    const changes = [{ type: "DELAY" as const, taskId: cleanupId, minutes: 30 }];
+    const impact = analyzeImpact(plan, changes);
+
+    const fallback = deterministicShiftOption(plan, changes, impact);
+    expect(fallback?.operations).toEqual([{ type: "shift", taskId: cleanupId, minutes: -30 }]);
+
+    const verified = verifyOptions(plan, changes, impact, fallback ? [fallback] : []);
+    expect(verified.verified).toHaveLength(1);
+    expect(verified.verified[0].plan.timeline.map((task) => task.startAt)).toEqual([
+      "2026-10-10T09:00:00.000Z",
+      "2026-10-10T09:30:00.000Z",
+    ]);
+  });
+
+  it("identifies only the known canned contingency titles as synthetic", () => {
+    expect(isSyntheticFallbackRisk({ title: "Delay affecting Venue cleanup" })).toBe(true);
+    expect(isSyntheticFallbackRisk({ title: "Move the ceremony to the indoor hall" })).toBe(false);
+  });
 });
 
 describe("RUN change intake", () => {
@@ -301,7 +329,6 @@ describe("RUN change intake", () => {
     });
     mocks.sql
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: "00000000-0000-4000-8000-000000000100" }]);
     mocks.llmJson
       .mockResolvedValueOnce({
@@ -338,6 +365,82 @@ describe("RUN change intake", () => {
         source: "deterministic",
         operations: [{ type: "shift", taskId: ids.caterer, minutes: -40 }],
       }],
+    });
+  });
+
+  it("returns a dependency-grounded manual Plan B when no automated option is safe", async () => {
+    const eventId = "00000000-0000-4000-8000-000000000099";
+    const plan = makePlan([
+      makeTask(ids.setup, "Venue cleanup", "2026-10-10T09:00:00.000Z", 30),
+      makeTask(ids.caterer, "Event wrap-up", "2026-10-10T09:30:00.000Z", 30, [ids.setup]),
+    ]);
+    mocks.consumeRateLimit.mockResolvedValue(true);
+    mocks.rateLimitIdentity.mockReturnValue("test-client");
+    mocks.loadOrganizerRun.mockResolvedValue({
+      eventId,
+      version: 1,
+      plan,
+      answers: {},
+      organizerToken: "test-token",
+    });
+    mocks.sql.mockResolvedValueOnce([]);
+    mocks.llmJson
+      .mockResolvedValueOnce({
+        changes: [{ type: "WEATHER", note: "Rain is coming" }],
+        clarifyingQuestion: null,
+      })
+      .mockResolvedValueOnce({
+        options: [
+          {
+            title: "Move wrap-up earlier",
+            operations: [{ type: "shift", taskId: ids.caterer, minutes: -10 }],
+            tradeoffs: ["Wrap-up begins earlier."],
+            rupeeImpact: 0,
+          },
+          {
+            title: "Remove cleanup",
+            operations: [{ type: "drop", taskId: ids.setup, reason: "Remove cleanup." }],
+            tradeoffs: ["Cleanup is removed."],
+            rupeeImpact: 0,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        options: [
+          {
+            title: "Move wrap-up earlier",
+            operations: [{ type: "shift", taskId: ids.caterer, minutes: -10 }],
+            tradeoffs: ["Wrap-up begins earlier."],
+            rupeeImpact: 0,
+          },
+          {
+            title: "Remove cleanup",
+            operations: [{ type: "drop", taskId: ids.setup, reason: "Remove cleanup." }],
+            tradeoffs: ["Cleanup is removed."],
+            rupeeImpact: 0,
+          },
+        ],
+      });
+
+    const response = await intakePost(
+      new Request(`https://eventmate.test/api/run/${eventId}/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: 1, text: "Rain is coming" }),
+      }),
+      { params: Promise.resolve({ eventId }) },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      manualPlanB: {
+        title: "Plan B: manual adjustment required",
+        summary: "No automated option passed the safety checks. Your plan has not been changed.",
+        steps: [
+          "Schedule Event wrap-up after Venue cleanup finishes. Confirm the finish time, then choose the next available slot.",
+          "Confirm whether Venue cleanup can be restored. If not, revise Event wrap-up so it no longer depends on that task.",
+        ],
+      },
     });
   });
 });
@@ -393,12 +496,12 @@ describe("RUN option generation", () => {
   });
 });
 
-describe("RUN risk generation fallback", () => {
+describe("RUN risk generation", () => {
   beforeEach(() => {
     mocks.llmJson.mockReset();
   });
 
-  it("keeps plan locking available when the risk model fails", async () => {
+  it("does not substitute canned contingencies when the risk model fails", async () => {
     mocks.llmJson.mockRejectedValue(new Error("Model returned invalid contingency JSON"));
     const plan = makePlan([
       makeTask(ids.setup, "Outdoor setup", "2026-10-10T09:00:00.000Z", 30),
@@ -408,20 +511,22 @@ describe("RUN risk generation fallback", () => {
     plan.timeline[1].vendorName = "Event Caterer";
     plan.constraints = { ...plan.constraints, outdoor: true };
 
-    const risks = await generateRisks(plan);
+    await expect(generateRisks(plan)).rejects.toThrow("Model returned invalid contingency JSON");
+    expect(mocks.llmJson).toHaveBeenCalledOnce();
+  });
 
-    expect(risks).toHaveLength(5);
-    expect(risks.map((risk) => risk.triggerType)).toEqual([
-      "DELAY", "VENDOR_CANCELLED", "GUEST_COUNT", "WEATHER", "VENUE_ISSUE",
-    ]);
-    for (const risk of risks) {
-      expect(risk.status).toBe("ready");
-      for (const operation of risk.backupAction) {
-        if (operation.type !== "add_task") {
-          expect(plan.timeline.some((task) => task.id === operation.taskId)).toBe(true);
-        }
-      }
-    }
+  it("rejects a generic canned risk response from the model", async () => {
+    mocks.llmJson.mockResolvedValue({
+      risks: [{
+        title: "Delay affecting Outdoor setup",
+        triggerType: "DELAY",
+        likelihood: "medium",
+        backupAction: [{ type: "shift", taskId: ids.setup, minutes: 15 }],
+      }],
+    });
+    const plan = makePlan([makeTask(ids.setup, "Outdoor setup", "2026-10-10T09:00:00.000Z", 30)]);
+
+    await expect(generateRisks(plan)).rejects.toThrow("was generic and not specific to this event");
   });
 });
 

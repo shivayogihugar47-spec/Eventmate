@@ -248,50 +248,39 @@ function SceneCard({ card, onAnswer }: { card:AssistantCard; onAnswer:(v:string,
             </div>
           ) : (
             card.step === 4 ? (
-              <div className="space-y-4">
-                <div className="relative h-40 overflow-hidden bg-[#214E43] sm:h-48" aria-label="Interactive place pin preview">
-                  <div className="absolute inset-0 opacity-30" style={{backgroundImage:"linear-gradient(rgba(226,236,220,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(226,236,220,.25) 1px, transparent 1px)",backgroundSize:"28px 28px"}}/>
-                  <div className="absolute left-[-10%] top-[48%] h-px w-[120%] rotate-[-12deg] bg-[#D8E3D8]/30"/>
-                  <div className="absolute left-[18%] top-[-40%] h-[180%] w-px rotate-[24deg] bg-[#D8E3D8]/30"/>
-                  <div className="absolute left-[58%] top-[-30%] h-[170%] w-px rotate-[-18deg] bg-[#D8E3D8]/30"/>
-                  <div className="absolute bottom-[18%] left-[12%] h-px w-[82%] rotate-[7deg] bg-[#D8E3D8]/20"/>
-                  <div className="absolute left-[8%] top-[12%] text-[9px] font-bold uppercase tracking-[0.2em] text-white/90">Your event, your coordinates</div>
-                  <AnimatePresence mode="wait">
-                    {textVal.trim()?(
-                      <motion.div key={textVal.trim()} initial={{opacity:0,y:-10,scale:0.88}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:8}}
-                        className="absolute left-1/2 top-[43%] flex -translate-x-1/2 flex-col items-center">
-                        <span className="mb-1 max-w-[220px] truncate border border-white/20 bg-[#173D34] px-3 py-1 text-[10px] font-bold text-white shadow-lg sm:max-w-xs sm:text-xs">{textVal.trim()}</span>
-                        <MapPin size={31} fill="#F6C65B" stroke="#173D34" strokeWidth={1.5}/>
-                        <motion.span initial={{scale:0.4,opacity:0.7}} animate={{scale:1.5,opacity:0}} transition={{duration:1.1,repeat:Infinity}}
-                          className="absolute top-[30px] h-5 w-5 rounded-full border border-[#F6C65B]"/>
-                      </motion.div>
-                    ):(
-                      <motion.div key="empty-pin" initial={{opacity:0}} animate={{opacity:1}}
-                        className="absolute inset-0 flex flex-col items-center justify-center pt-5 text-center">
-                        <MapPin size={27} className="text-[#F6C65B]"/>
-                        <p className="mt-2 text-xs font-semibold text-white/80">The map is yours to define</p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  <div className="absolute bottom-3 right-3 text-[9px] font-bold uppercase tracking-widest text-white/90">PLACE PIN · {textVal.trim()?"SET":"WAITING"}</div>
-                </div>
+              <div className="relative overflow-hidden rounded-3xl border border-[#E5E0D3] bg-gradient-to-br from-[#F8F7F2] via-white to-[#EDF4EC] p-5 shadow-[0_12px_30px_rgba(33,78,67,0.07)] sm:p-7">
+                <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-[#E7BD68]/15 blur-2xl" aria-hidden="true"/>
+                <div className="relative">
+                  <div className="mb-5 flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#214E43] text-[#F6C65B] shadow-sm">
+                      <MapPin size={19}/>
+                    </span>
+                    <div>
+                      <p className="text-sm font-extrabold text-[#20372D]">Set the scene</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-[#66736A]">Your city helps tailor the plan and local vendor searches.</p>
+                    </div>
+                  </div>
 
-                <div>
-                  <label htmlFor="custom-city" className="mb-2 block text-[10px] font-bold uppercase tracking-[0.14em] text-[#66736A]">Where should the celebration happen?</label>
-                  <div className="relative">
-                    <input id="custom-city" ref={inputRef} type="text" value={textVal}
-                      onChange={e=>setTextVal(e.target.value)}
-                      onKeyDown={e=>{if(e.key==="Enter"&&textVal.trim())submit(textVal.trim(),textVal.trim());}}
-                      placeholder="Enter any city, town, or place"
-                      className="w-full border-0 border-b-2 border-[#DADDD2] bg-transparent py-3 pr-36 text-lg font-semibold text-[#202B27] outline-none placeholder:text-sm placeholder:font-normal placeholder:text-[#66736A] focus:border-[#315C4C] sm:text-xl"/>
+                  <label htmlFor="custom-city" className="mb-2 block text-xs font-bold text-[#34483F]">Celebration city</label>
+                  <div className="flex flex-col gap-2 rounded-2xl border border-[#D8D6CD] bg-white p-2 shadow-sm transition focus-within:border-[#315C4C] focus-within:ring-4 focus-within:ring-[#315C4C]/10 sm:flex-row sm:items-center">
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5 px-2">
+                      <MapPin size={16} className="shrink-0 text-[#66736A]" aria-hidden="true"/>
+                      <input id="custom-city" ref={inputRef} type="text" value={textVal}
+                        onChange={e=>setTextVal(e.target.value)}
+                        onKeyDown={e=>{if(e.key==="Enter"&&textVal.trim())submit(textVal.trim(),textVal.trim());}}
+                        placeholder="Enter a city or town"
+                        className="h-11 min-w-0 flex-1 border-0 bg-transparent text-base font-semibold text-[#202B27] outline-none placeholder:text-sm placeholder:font-normal placeholder:text-[#66736A] focus:ring-0 sm:text-lg"/>
+                    </div>
                     <motion.button onClick={()=>textVal.trim()&&submit(textVal.trim(),textVal.trim())}
-                      whileHover={{scale:1.06}} whileTap={{scale:0.94}} disabled={!textVal.trim()}
-                      aria-label="Use this place"
-                      className="absolute right-0 top-2 flex h-10 items-center gap-2 whitespace-nowrap bg-[#214E43] px-3 text-xs font-extrabold text-white transition-colors hover:bg-[#173D34] disabled:cursor-not-allowed disabled:bg-[#DADDD2]">
-                      Use this place <ArrowRight size={15}/>
+                      whileHover={{y:-1}} whileTap={{scale:0.98}} disabled={!textVal.trim()}
+                      className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#214E43] px-5 text-sm font-extrabold text-white transition-colors hover:bg-[#173D34] disabled:cursor-not-allowed disabled:bg-[#DADDD2] disabled:text-[#66736A]">
+                      Use this city <ArrowRight size={15}/>
                     </motion.button>
                   </div>
-                  <p className="mt-2 text-[10px] text-[#66736A]">Type any location. Nothing is preselected.</p>
+                  <p className="mt-3 flex items-center gap-2 text-[11px] text-[#66736A]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#A77D2B]" aria-hidden="true"/>
+                    City or town is all we need to get started.
+                  </p>
                 </div>
               </div>
             ) : (
@@ -806,12 +795,6 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
       {/* Nav */}
       <nav className="relative z-20 flex items-center justify-between px-5 py-4 sm:px-8 sm:py-5 max-w-7xl mx-auto">
         <div className="flex items-center gap-3">
-          {/* Clay logo badge */}
-          <div className="relative">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#214E43]">
-              <Sparkles size={17} className="text-[#F6C65B]"/>
-            </div>
-          </div>
           <Image
             src="/jashn-logo.png"
             alt="Jashn — Plans your celebration. Runs it too."
@@ -879,20 +862,6 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
 
         {/* Left text */}
         <div className="text-center lg:text-left">
-          <Image
-            src="/jashn-logo.png"
-            alt="Jashn — Plans your celebration. Runs it too."
-            width={560}
-            height={180}
-            priority
-            className="mx-auto mb-5 h-16 w-auto max-w-full object-contain lg:mx-0 sm:h-20"
-          />
-          {/* Clay badge */}
-          <motion.div initial={{opacity:0,y:-12,scale:0.9}} animate={{opacity:1,y:0,scale:1}}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4 text-[11px] font-bold uppercase tracking-wider bg-[#E8EEE7] text-[#315C4C]">
-            <Sparkles size={12}/> Your thoughtful AI event planner
-          </motion.div>
-
           <motion.h1 initial={{opacity:0,y:24}} animate={{opacity:1,y:0}} transition={{delay:0.07}}
             className="font-extrabold font-display leading-[1.04] mb-4 text-[#202B27] text-4xl sm:text-5xl lg:text-7xl">
             Plan the details.<br className="hidden sm:block"/><span className="text-[#D9684E]">Be there for the moment.</span>

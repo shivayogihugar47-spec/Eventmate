@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { loadOwnedOrganizerRun, consumeRateLimit, rateLimitIdentity } from "@/lib/run/security";
 import { isUuid } from "@/lib/apiRequest";
+import { isSyntheticFallbackRisk } from "@/lib/run/types";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
@@ -34,7 +35,7 @@ export async function GET(request: Request, context: RouteContext) {
         likelihood: risk.likelihood,
         backupAction: risk.backup_action,
         status: risk.status,
-      })),
+      })).filter((risk) => !isSyntheticFallbackRisk(risk)),
       audit: auditRows,
       ownerLinks: ownerRows,
     });

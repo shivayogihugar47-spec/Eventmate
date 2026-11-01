@@ -121,6 +121,13 @@ const ChatRequestSchema = z.object({
   planData: PlanDataSchema.optional(),
 }).strict();
 
+function isMissingDatabaseSchema(error: unknown): boolean {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error.code === "42703" || error.code === "42P01");
+}
+
 // ─── Plan generation prompt ───────────────────────────────────────────────────
 function buildPlanPrompt(d: z.infer<typeof PlanDataSchema>): string {
   const budgetTotal = parseBudget(d.budgetTotal ?? "");
@@ -229,14 +236,26 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error(`[${failureStage}] /api/chat`, err);
     if (generatingPlan) {
+      const schemaOutdated = failureStage === "saving the locked plan"
+        && isMissingDatabaseSchema(err);
       const error = failureStage === "AI plan generation"
         ? "The AI could not finish a valid plan. Your answers are still here; please retry."
         : failureStage === "contingency generation"
           ? "The plan could not finish preparing its Plan B contingencies. Your answers are still here; please retry."
           : failureStage === "saving the locked plan"
-            ? "The plan was generated but could not be saved. Check the database connection, then retry."
+            ? schemaOutdated
+              ? "The database schema needs an update before plans can be saved. Run npm run db:migrate against the database configured for this app, then retry."
+              : "The plan was generated but could not be saved. Check the database connection, then retry."
             : "Unable to generate the event plan. Your answers are still here; please retry.";
-      return NextResponse.json({ error }, { status: failureStage === "AI plan generation" || failureStage === "contingency generation" ? 503 : 500 });
+      return NextResponse.json({
+        error,
+      }, {
+        status: failureStage === "AI plan generation"
+          || failureStage === "contingency generation"
+          || schemaOutdated
+          ? 503
+          : 500,
+      });
     }
     if (err instanceof z.ZodError || err instanceof SyntaxError) {
       return NextResponse.json({ error: "The planning request is invalid or too long." }, { status: 400 });

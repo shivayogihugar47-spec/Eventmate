@@ -70,6 +70,11 @@ export interface PlanRisk {
   status?: "ready" | "triggered" | "resolved" | "dismissed";
 }
 
+export function isSyntheticFallbackRisk(risk: Pick<PlanRisk, "title">): boolean {
+  return /^(?:Delay affecting .+|Vendor cancellation for .+|Guest surge beyond \d+ attendees|(?:Rain plan for outdoor event|Weather disruption plan) near .+|Venue access issue affecting .+)$/i
+    .test(risk.title);
+}
+
 export interface ImpactViolation {
   type: "dependency" | "venue_close" | "vendor_window" | "event_end" | "budget";
   taskId?: string;

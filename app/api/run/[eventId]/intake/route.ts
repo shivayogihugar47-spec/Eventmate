@@ -22,6 +22,56 @@ const RequestSchema = z.object({
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
+function manualPlanB(failures: string[], optionsUnavailable = false) {
+  if (optionsUnavailable) {
+    return {
+      title: "Plan B: manual adjustment required",
+      summary: "Automated options could not be generated. Your plan has not been changed.",
+      steps: ["Keep the current schedule in place. Confirm a safe adjustment with the event organizer, then retry when automated options are available."],
+      blockers: failures.slice(0, 3),
+    };
+  }
+
+  const steps = failures
+    .map((failure) => {
+      const separator = failure.indexOf(": ");
+      return separator < 0 ? failure : failure.slice(separator + 2);
+    })
+    .map((reason) => {
+      const dependency = reason.match(/^(.+) starts before (.+) finishes\.$/);
+      if (dependency) {
+        return `Schedule ${dependency[1]} after ${dependency[2]} finishes. Confirm the finish time, then choose the next available slot.`;
+      }
+      const cancelledDependency = reason.match(/^(.+) depends on cancelled task (.+)\.$/);
+      if (cancelledDependency) {
+        return `Confirm whether ${cancelledDependency[2]} can be restored. If not, revise ${cancelledDependency[1]} so it no longer depends on that task.`;
+      }
+      const venueClose = reason.match(/^(.+) ends after the venue closes\.$/);
+      if (venueClose) {
+        return `Move or shorten ${venueClose[1]} so it finishes before the venue closes, or confirm an extension with the venue.`;
+      }
+      const eventEnd = reason.match(/^(.+) ends after the event end time\.$/);
+      if (eventEnd) {
+        return `Move or shorten ${eventEnd[1]} so it finishes before the planned event end.`;
+      }
+      if (/budget/i.test(reason)) {
+        return "Rework the affected costs or confirm a budget increase before approving this change.";
+      }
+      return `Resolve this schedule check before applying the change: ${reason}`;
+    })
+    .filter((step, index, all) => all.indexOf(step) === index)
+    .slice(0, 3);
+
+  return {
+    title: "Plan B: manual adjustment required",
+    summary: "No automated option passed the safety checks. Your plan has not been changed.",
+    steps: steps.length > 0
+      ? steps
+      : ["Review the affected tasks and constraints, make a feasible update, then submit it again."],
+    blockers: failures.slice(0, 3),
+  };
+}
+
 export async function POST(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
   if (!isUuid(eventId)) return NextResponse.json({ error: "Event not found." }, { status: 404 });
@@ -90,9 +140,6 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ completedTask: true, version: result.version, plan: result.plan });
     }
 
-    await Promise.all(changes.map((change) => sql`INSERT INTO plan_events (event_id, type, payload, actor)
-      VALUES (${run.eventId}, ${change.type}, ${JSON.stringify(change)}, 'organizer')`));
-
     const impact = analyzeImpact(run.plan, changes);
     const risksRows = await sql`SELECT id, title, trigger_type, likelihood, backup_action, status
       FROM risks WHERE event_id = ${run.eventId} AND status IN ('ready', 'triggered')`;
@@ -114,18 +161,37 @@ export async function POST(request: Request, context: RouteContext) {
     try {
       options = await generateOptions({ plan: run.plan, changes, impact, risks, priorities, constraints });
     } catch (error) {
-      if (!(error instanceof z.ZodError)) throw error;
+      if (!(error instanceof z.ZodError)) {
+        console.error("[/api/run intake] Automated options could not be generated.", error);
+        return NextResponse.json({
+          manualPlanB: manualPlanB(["Automated options could not be generated."], true),
+        });
+      }
       console.warn("[/api/run intake] Option output failed validation; trying a deterministic schedule-only fallback.", error.issues);
       const fallback = deterministicShiftOption(run.plan, changes, impact);
-      if (!fallback) throw error;
+      if (!fallback) {
+        return NextResponse.json({
+          manualPlanB: manualPlanB(["No safe deterministic adjustment was available."], true),
+        });
+      }
       options = [fallback];
     }
     let verification = verifyOptions(run.plan, changes, impact, options);
     if (verification.verified.length === 0) {
-      options = await generateOptions({
-        plan: run.plan, changes, impact, risks, priorities, constraints,
-        retryReasons: verification.failures, usePrepared: false,
-      });
+      try {
+        options = await generateOptions({
+          plan: run.plan, changes, impact, risks, priorities, constraints,
+          retryReasons: verification.failures, usePrepared: false,
+        });
+      } catch (error) {
+        console.error("[/api/run intake] Safe option retry failed.", error);
+        return NextResponse.json({
+          manualPlanB: manualPlanB(
+            [...verification.failures, "Automated option retry failed."],
+            true,
+          ),
+        });
+      }
       verification = verifyOptions(run.plan, changes, impact, options);
     }
     if (verification.verified.length === 0) {
@@ -134,9 +200,8 @@ export async function POST(request: Request, context: RouteContext) {
     }
     if (verification.verified.length === 0) {
       return NextResponse.json({
-        error: "I couldn't find a safe verified adjustment. Your plan is unchanged; refine the update and try again.",
-        reasons: verification.failures,
-      }, { status: 422 });
+        manualPlanB: manualPlanB(verification.failures),
+      });
     }
 
     const payload = {
