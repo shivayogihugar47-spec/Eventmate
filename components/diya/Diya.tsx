@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useDiya, type DiyaMood } from "@/lib/diyaStore";
@@ -15,18 +14,6 @@ export const DIYA_SRC: Record<DiyaMood, string> = {
   idle:      "/diya/wave_transparent.webp",
   sleep:     "/diya/wave_transparent.webp",
 };
-
-// Preload every mood once, on app start, so switching is instant.
-let preloaded = false;
-export function preloadDiya() {
-  if (preloaded || typeof window === "undefined") return;
-  preloaded = true;
-  Object.values(DIYA_SRC).forEach((src) => {
-    const img = new window.Image();
-    img.decoding = "async";
-    img.src = src;
-  });
-}
 
 // ── CSS accessories by event type ────────────────────────────────────────────
 export type EventCostume = "wedding" | "birthday" | "community" | "corporate" | "festival" | "none";
@@ -87,14 +74,13 @@ export function Diya({ size = 120, costume = "none", moodOverride, className = "
   const reduceMotion = useReducedMotion();
   const prefReduced = mascotPref === "reduced" || reduceMotion;
 
-  // Preload on first mount so crossfades never wait on the network.
-  useEffect(() => { preloadDiya(); }, []);
-
   if (mascotPref === "off") return null;
 
   return (
-    <motion.div
-      className={`relative flex-shrink-0 cursor-pointer select-none ${className}`}
+    <motion.button
+      type="button"
+      aria-label={`Diya mascot, ${mood} mood`}
+      className={`relative flex-shrink-0 cursor-pointer select-none border-0 bg-transparent p-0 ${className}`}
       style={{ width: size, height: size }}
       onClick={handleClick}
       whileTap={prefReduced ? undefined : { scale: 0.92 }}
@@ -126,7 +112,6 @@ export function Diya({ size = 120, costume = "none", moodOverride, className = "
               height={size}
               className="object-contain w-full h-full drop-shadow-lg"
               unoptimized
-              priority
             />
           </motion.div>
         </AnimatePresence>
@@ -134,6 +119,6 @@ export function Diya({ size = 120, costume = "none", moodOverride, className = "
 
       {isAsleep && !moodOverride && <ZzzBubble />}
       <CostumeAccessory costume={costume} size={size} />
-    </motion.div>
+    </motion.button>
   );
 }

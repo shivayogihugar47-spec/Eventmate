@@ -117,7 +117,7 @@ export function FloatingDiya() {
           >
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-[#374151]">Mascot Settings</p>
-              <button onClick={() => setShowSettings(false)} className="text-[#9CA3AF] hover:text-[#374151]">
+              <button onClick={() => setShowSettings(false)} className="text-[#66736A] hover:text-[#374151]">
                 <X size={13} />
               </button>
             </div>

@@ -82,7 +82,7 @@ export function AuthDialog({ onClose, onAuthenticated }: Props) {
           <label className="block">
             <span className="mb-1.5 block text-xs font-bold text-[#34483F]">Password</span>
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} maxLength={128} autoComplete={mode === "sign-up" ? "new-password" : "current-password"} className="h-11 w-full rounded-xl border border-[#D8D6CD] bg-white px-3 text-sm text-[#202B27] outline-none focus:border-[#A77D2B]"/>
-            {mode === "sign-up" && <span className="mt-1 block text-[11px] text-[#899189]">Use at least 8 characters.</span>}
+            {mode === "sign-up" && <span className="mt-1 block text-[11px] text-[#66736A]">Use at least 8 characters.</span>}
           </label>
           {error && <p role="alert" className="rounded-xl border border-[#F0D3CB] bg-[#FFF5F1] px-3 py-2.5 text-xs leading-relaxed text-[#9A4938]">{error}</p>}
           <button type="submit" disabled={pending} className="flex h-11 w-full items-center justify-center rounded-xl bg-[#214E43] px-4 text-sm font-extrabold text-white transition hover:bg-[#173D34] disabled:cursor-wait disabled:opacity-60">

@@ -1,250 +1,155 @@
 # EventMate Live
 
-A conversational AI event-planning assistant for weddings, birthdays, and community events.
-Built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, **Zustand**, **OpenRouter**, and **Neon (serverless Postgres)**.
+EventMate Live helps people turn an event idea into a practical plan. Answer a short set of questions about the event, guests, location, budget, accessibility, and age mix; review a generated plan; then use its timeline, budget, vendor-search links, and checklist to organize the day.
 
-The assistant is fronted by **Diya**, a mood-reactive mascot that celebrates, worries, and comments on the plan as it takes shape.
+It is for people planning weddings, birthdays, community gatherings, corporate events, festivals, and other celebrations—especially organizers who want a structured starting point without needing event-planning expertise.
 
----
+## What it does
 
-## Project Structure
+- Guides visitors through the ASK flow before asking them to sign in.
+- Generates a tailored PLAN with a timeline, budget, checklist, and vendor categories.
+- Uses the city and selected category to open external vendor-search links. EventMate does not scrape, verify, or claim availability for those listings.
+- Provides a RUN Command Center for approved schedule changes, owner task links, and event wrap-up.
+- Lets signed-in users save and reopen plans. Visitors can try the planner without an account; account-linked saved events require Neon Auth configuration.
+- Uses Diya as an optional mascot. Its images load on demand, and reduced-motion preferences are respected.
 
-```
-eventmate-live/
-├── app/
-│   ├── api/
-│   │   ├── chat/route.ts       # Core state machine: ASK → PLAN → RUN/RE-PLAN
-│   │   ├── comment/route.ts    # Witty one-line mascot reactions per wizard step
-│   │   ├── compare/route.ts    # Vendor quote comparison (Zod-validated LLM JSON)
-│   │   ├── whatif/route.ts     # "What If" cost-impact analysis
-│   │   └── health/route.ts     # End-to-end health check for all wired services
-│   ├── page.tsx                # Main planner UI (client component)
-│   ├── layout.tsx              # Root layout & metadata
-│   ├── ClientProviders.tsx     # Mounts floating mascot, cursor sparks, Konami egg
-│   └── globals.css
-├── components/
-│   └── diya/                   # Mascot component suite (see "Diya Mascot" below)
-├── db/
-│   └── schema.sql              # All table definitions
-├── lib/
-│   ├── api.ts                  # Typed client wrappers for the API routes
-│   ├── auth.ts                 # Neon Auth (Managed Better Auth) config helpers
-│   ├── db.ts                   # Neon sql client
-│   ├── diyaStore.ts            # Zustand store for mascot mood/speech/settings
-│   ├── functions.ts            # Neon Functions client helpers
-│   ├── llm.ts                  # OpenRouter client + llmJson helper
-│   ├── useLiveEvent.ts         # SWR polling hook (client-side)
-│   └── stages/
-│       ├── ask.ts              # Q&A gathering stage
-│       ├── plan.ts             # Plan generation + budget normalization
-│       ├── replan.ts           # Re-plan diff + commit
-│       ├── cascade.ts          # Dependency cascade logic
-│       └── run.ts              # Day-of execution stage
-├── scripts/
-│   └── migrate.ts              # DB migration runner
-├── tests/
-│   └── plan.test.ts            # Vitest unit tests for plan/re-plan logic
-├── hello.ts                    # Neon Function: trivial liveness probe
-└── neon.ts                     # Neon project config (auth, functions, branches)
-```
-
-## RUN architecture
-
-RUN starts when an organizer locks a generated plan. The plan is saved as version 1, with prepared risks, task records, expiring owner links, and an append-only audit entry. Event-day changes do not regenerate the plan: they go through this pipeline:
+## Architecture
 
 ```text
-CHANGE -> INTAKE -> IMPACT ENGINE -> OPTION GENERATOR -> VERIFIER
-       -> APPROVAL -> APPLY -> NOTIFY -> AUDIT
+Browser (Next.js App Router)
+  ├─ Landing → ASK flow → PLAN reveal → RUN Command Center
+  ├─ Neon Auth client (optional account sign-in)
+  └─ Same-origin /api routes
+       ├─ Zod-validated, size-limited requests
+       ├─ Database-backed request limits for LLM routes
+       ├─ OpenRouter primary model → configured fallback model
+       └─ Neon Postgres
+            ├─ events, plans, tasks, risks, owner links
+            └─ append-only plan event history
 ```
 
-| Stage | AI or plain code? | Responsibility |
+The Next.js app and API routes deploy to Vercel. PostgreSQL and optional Managed Auth are provided by Neon. OpenRouter requests stay server-side; model responses are validated with Zod before they are used.
+
+## AI versus plain code
+
+| Area | AI or plain code? | What it does |
 |---|---|---|
-| Intake | AI (`llmJson`, Zod validated) | Converts a free-text update into one or more typed changes; asks one clarifying question when needed. Quick actions use plain code. |
-| Prepared risks | AI (`llmJson`, Zod validated) | Creates five event-specific risks and structured contingency operations when the plan is locked. A matching contingency is offered before generating new options. |
-| Impact | Plain TypeScript | Computes downstream effects, task timing, critical path/slack, budget deltas, and hard-constraint violations. |
-| Options | AI (`llmJson`, Zod validated) | Proposes ranked structured operations and tradeoffs; it cannot edit the plan. |
-| Verification | Plain TypeScript | Applies each proposal to a copy, reruns impact/constraint checks, and removes unsafe options. |
-| Approval and apply | Plain TypeScript + database transaction | The organizer selects a verified option. Version checks reject stale approvals; an idempotency key protects retries. Applying creates a new plan snapshot and audit event. |
-| Owner messages | AI (`llmJson`, Zod validated) | Drafts short task updates for organizers to copy or open in WhatsApp; messages are never auto-sent. |
-| Scheduling and live state | Plain TypeScript + database | Computes Now/Next from task state and the clock; SWR refreshes the Command Center every three seconds. |
-| Audit | Plain TypeScript + database | Stores append-only change, apply, notification, and template events for the timeline. |
+| ASK question flow | Plain code | Enforces required fields and selects the next question. |
+| PLAN generation | AI, Zod validated | Drafts the timeline, budget notes, vendor categories, checklist, and guest-aware suggestions. |
+| Budget normalization | Plain code | Applies the chosen total budget to the generated allocations. |
+| RUN change intake | AI, Zod validated | Converts an organizer's free-text update into typed changes. |
+| RUN impact analysis | Plain TypeScript | Calculates task effects, schedule constraints, critical path, and budget deltas. |
+| RUN options | AI proposals + plain-code verification | Proposals are checked against the plan before an organizer can approve them. |
+| Persistence and audit | Plain code + Postgres | Saves plan versions, owner links, task changes, and audit events. |
+| Vendor search | Plain code | Creates category-and-city search links; it does not fetch or verify business listings. |
 
-The event-day Command Center is organized as a live runbook: schedule and progress, change desk, prepared Plan B, team links, decision history, and post-event wrap-up. Organizers can mark a task complete directly; completion is recorded as a new version with optimistic concurrency and an audit entry. Schedule changes still go through impact analysis, verified options, and organizer approval. Task owners use expiring, unguessable links scoped to their assigned tasks. If the network drops, organizer updates are queued locally and retried after reconnecting.
+## Setup
 
-## Vendor search links
+### Prerequisites
 
-The Vendors tab creates city- and category-specific search links for the web, Google Maps, Justdial, and WedMeGood. It requires no API key or account setup and does not fetch or republish third-party listings. Justdial and WedMeGood links use a site-filtered web search. Search results are external and are not verified by EventMate; confirm services, availability, and pricing directly with each business.
+- Node.js compatible with the project's Next.js version
+- An OpenRouter API key and model IDs
+- A Neon Postgres database
 
-## Accounts and saved events
+### Local development
 
-Email/password accounts use Neon Managed Auth. Sign in before starting a plan; each locked event is linked to the account that created it. **My saved events** lists that account's plans, and reopening an event loads its latest saved plan version. Event APIs verify either the organizer's existing bearer token or the signed-in account that owns the event. Legacy events created before account ownership was added are not automatically assigned to a user.
+1. Install dependencies:
 
----
+   ```powershell
+   npm install
+   ```
 
-## Manual Setup Steps
+2. Copy `.env.example` to `.env.local` and add the four required values listed below. Keep `.env.local` private; it is git-ignored.
 
-### 1 — Create a Neon project
+3. Apply the database schema:
 
-1. Go to [console.neon.tech](https://console.neon.tech) and sign in (free tier available).
-2. Click **New Project**, give it a name (e.g., `eventmate-live`), and choose a region.
-3. Copy the **Connection string** from the project dashboard.
+   ```powershell
+   npm run db:migrate
+   ```
 
-### 2 — Get an OpenRouter API key
+   `DATABASE_URL_UNPOOLED` is optional for migrations; when omitted, the script uses `DATABASE_URL`.
 
-1. Go to [openrouter.ai/keys](https://openrouter.ai/keys) and sign in.
-2. Create a new API key and copy it.
-3. Note: OpenRouter no longer serves the free `:free` variants of these models — use the paid slugs below.
+4. Start the app:
 
-### 3 — Configure environment variables
+   ```powershell
+   npm run dev
+   ```
 
-Copy `.env.example` to `.env.local` and fill in your values:
+5. Open `http://localhost:3000`. The landing page can start ASK without an account. Sign in is only needed to associate plans with an account and use **My saved events**.
 
-```env
-# OpenRouter (LLM)
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
-OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct
-OPENROUTER_FALLBACK_MODEL=openai/gpt-4o-mini
-OPENROUTER_VISION_MODEL=                       # optional, fill when needed
+### Environment variables
 
-# Neon Postgres
-DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
-DATABASE_URL_UNPOOLED=
+Set these **four required variables** in the Vercel project to deploy the guest planning flow:
 
-# Neon branch context
-NEON_BRANCH=
-
-# Neon Auth (filled automatically by `neon deploy`)
-NEON_AUTH_BASE_URL=
-NEON_AUTH_JWKS_URL=
-
-# Neon Functions (filled automatically by `neon deploy`)
-NEON_FUNCTION_HELLO_BASE_URL=
-```
-
-> `.env.local` is git-ignored. Never commit real keys.
-
-### 4 — Configure authentication
-
-Managed Neon Auth is enabled for the production branch. Set `NEON_AUTH_COOKIE_SECRET` to a random secret of at least 32 characters in `.env.local` and in the app host's server environment. A local secret can be generated with:
-
-```bash
-node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
-```
-
-Email/password sign-up and sign-in use Neon Auth. Users can create and reopen their own saved events from **My saved events**. New event plans are associated with the signed-in account; legacy events without an owner remain unchanged.
-
-### 5 — Run the database migration
-
-```bash
-npm run db:migrate
-```
-
-This reads `db/schema.sql` and creates all tables on your Neon database.
-Safe to re-run – all tables use `CREATE TABLE IF NOT EXISTS`.
-
-### 6 — Start the dev server
-
-```bash
-npm run dev
-```
-
-The app runs at [http://localhost:3000](http://localhost:3000).
-
----
-
-## Testing the Health Endpoint
-
-With the dev server running, open a browser or use curl:
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-It probes every wired service end-to-end: OpenRouter, Neon Postgres, Neon Auth (JWKS reachability), and the `hello` Neon Function.
-
-### Expected response (all OK)
-
-```json
-{
-  "openrouter": { "status": "ok" },
-  "openrouter_model": "meta-llama/llama-3.3-70b-instruct:free",
-  "database": { "status": "ok" },
-  "neon_auth": { "status": "ok" },
-  "neon_function_hello": { "status": "ok", "response": "Hello from Neon Functions" },
-  "allOk": true
-}
-```
-
-HTTP status `200`. If any service fails, its entry carries an `error` status with a `detail` message and the response is `503`.
-
----
-
-## Architecture & Prompt Flow
-
-### Core Architecture
-- **State Machine:** The app transitions between `ASK`, `PLAN`, and `RUN/RE-PLAN` stages.
-- **Data Persistence:** All event data, chat history, and plan versions are stored in Neon Postgres (`events`, `tasks`, `budget_items`, `expenses`, `messages`, `plan_versions`).
-- **Mascot Store:** `useDiya` (Zustand) manages mascot moods, speech, and accessibility settings globally.
-
-### Prompt Flow
-1. **Extraction (ASK):** User input is passed to an LLM to extract event details (city, date, budget, etc.). Logic in `ask.ts` ensures all required fields are collected before plan generation.
-2. **Generation (PLAN):** Once all data is collected, a comprehensive plan is generated. Budget allocations are normalized in code to sum exactly to the total, weighted by user priorities.
-3. **Re-planning (RE-PLAN):** Any message changing core event parameters triggers a re-plan. The LLM extracts the changes and proposes trade-offs. A visual diff is generated for user approval before commit.
-
-### AI vs. Plain Code
-- **AI:** Data extraction, budget weighting, task description generation, re-plan impact analysis, vendor comparison, "what-if" scenarios, and witty mascot dialogue.
-- **Code:** Stage transitions, budget normalization (sum-to-total), backward scheduling logic, database versioning, and mascot physics/animations.
-
----
-
-## Diya Mascot
-
-Diya is a stateful, mood-reactive companion implemented in `components/diya/`.
-
-- **Moods:** `wave`, `greet`, `thinking`, `celebrate`, `worried`, `idle`, `sleep` — crossfaded via Framer Motion.
-- **Placements:** landing "Light the Lamp" hero sequence, floating corner companion, journey stepper, budget watcher, bill scanner, delay alerts, typing indicator, empty states, celebration moment, and a command center.
-- **Settings:** an On / Reduced / Off intensity toggle (persisted in `localStorage` as `mascot-pref`). The settings entry point stays visible even when the mascot is hidden so it can be re-enabled.
-- **Easter eggs:** click Diya five times to trigger party mode; enter the Konami code to make Diya sprint across the screen.
-- **Performance:** animations use only `transform`/`opacity`; heavy elements (e.g. confetti) are lazy-loaded and the mascot is `dynamic(..., { ssr: false })`.
-
----
-
-## 4-Step Demo Script
-
-1. **The Birthday Prompt:** Type "I want to plan a 1st birthday party for my daughter in Bangalore on Dec 15th for 100 people."
-2. **Priorities:** When Eve asks for priorities, say "Food is most important, followed by Decor, then Photography, Venue, and Entertainment."
-3. **The Plan:** Review the generated plan, timeline, and budget. Notice how Food has the largest allocation.
-4. **The Re-plan:** Type "Budget dropped 30%, and the event is now 2 weeks earlier." Accept the trade-offs Eve proposes in the diff modal.
-
----
-
-## Available Scripts
-
-| Script | Purpose |
+| Variable | Purpose |
 |---|---|
-| `npm run dev` | Start Next.js dev server |
-| `npm run build` | Production build |
-| `npm run start` | Run production build |
-| `npm run lint` | ESLint |
-| `npm run test` | Run Vitest unit tests |
-| `npm run db:migrate` | Apply `db/schema.sql` to Neon |
+| `OPENROUTER_API_KEY` | Server-side key for model requests. |
+| `OPENROUTER_MODEL` | Primary OpenRouter model ID. |
+| `OPENROUTER_FALLBACK_MODEL` | Model ID used if the primary fails or is rate-limited. |
+| `DATABASE_URL` | Neon Postgres connection string. |
 
----
+The code has model defaults, but setting both model IDs explicitly makes the deployment reproducible. Do not prefix server-only secrets with `NEXT_PUBLIC_`.
 
-## Tech Stack
+**Account sign-in and account-linked saved events need three additional Neon Auth variables** in Vercel: `NEON_AUTH_BASE_URL`, `NEON_AUTH_JWKS_URL`, and `NEON_AUTH_COOKIE_SECRET` (at least 32 random characters). These are not part of the four-variable guest-planner deployment. The auth proxy returns a clear unavailable response when Auth is not configured; it does not expose a server stack trace.
 
-| Layer | Choice |
+Optional local/integration variables:
+
+| Variable | Purpose |
 |---|---|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS, Inter / Plus Jakarta Sans |
-| Animation | Framer Motion |
-| State | Zustand |
-| LLM | OpenRouter → Llama 3.3 70B, GPT-4o mini fallback |
-| Database | Neon serverless Postgres |
-| Auth | Neon Auth (Managed Better Auth) |
-| Functions | Neon Functions |
-| Data fetching | SWR (3 s polling) |
-| Charts | Recharts |
-| Validation | Zod |
-| Testing | Vitest |
+| `DATABASE_URL_UNPOOLED` | Direct Neon connection for schema migrations. |
+| `NEON_FUNCTION_HELLO_BASE_URL` | Optional URL for the Neon hello Function client. |
+
+`.env.example` lists the application's environment variables with **no values**. `.env.local` is covered by `.gitignore`.
+
+### Vercel deployment
+
+Import the repository into Vercel and use the standard Next.js build settings. No custom `vercel.json` is required. Add the four required variables above to the appropriate Vercel environments, then deploy. Add the three Neon Auth variables only if account sign-in and account-linked saved events are required for that deployment.
+
+Run `npm run db:migrate` against the production database before the first live plan is created. The migration is repeatable and adds the current schema, including the organizer-token expiry column.
+
+## Tests and checks
+
+```powershell
+npm run test
+npm run lint -- --max-warnings=0
+npx tsc --noEmit
+npm run build
+```
+
+## Demo script
+
+1. Open the landing page in a signed-out browser and start an event plan.
+2. Choose a wedding, birthday, community event, corporate event, festival, or other gathering.
+3. Answer the date, guest-count, city, and budget questions.
+4. Answer the event-specific questions.
+5. Enter access and dietary needs—for example, step-free access, wheelchair access, seating for elderly guests, or dietary restrictions.
+6. Select the age mix of the guests.
+7. Generate the plan; review the visible guest-needs summary and confirm that the timeline, seating/venue tasks, menu, and activities reflect those answers.
+8. Open the Vendors tab, choose a category, and verify that the search links use the selected city.
+9. Open the Command Center and try a scenario such as “The caterer is 40 minutes late,” “It may rain,” “30 more guests are coming,” or “The venue closes one hour earlier.” Review the proposed change before approving it.
+10. If Auth is configured, sign in, create another plan, and verify it appears in **My saved events** after reloading.
+
+## Submission smoke test (live Vercel URL)
+
+1. Open the live URL in a private window; confirm the first screen offers **Build my event plan** without a sign-in gate.
+2. Start a plan and verify the ASK flow reaches both required guest-needs questions.
+3. Enter wheelchair/step-free access, elderly seating, and dietary needs; confirm the answer is retained in the sidebar and the finished plan.
+4. Choose an age mix and confirm it is visible in the plan.
+5. Generate a plan; confirm timeline/seating and menu/activity suggestions reflect both answers.
+6. Open `/api/health`; confirm the response reports the database and OpenRouter configuration without exposing credentials or stack traces.
+7. Open Vendors; switch categories and confirm each search URL includes the selected city.
+8. Test a RUN change; verify options are shown for review and the plan changes only after approval.
+9. If Auth is configured, sign in, save a plan, reload, and reopen it from **My saved events**.
+10. Simulate an unavailable or rate-limited model; confirm the backup-model retry state appears and the failure message offers a clear retry without losing ASK answers.
+
+## Scripts
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start local development. |
+| `npm run build` | Create the production build. |
+| `npm run start` | Serve the production build locally. |
+| `npm run lint -- --max-warnings=0` | Run ESLint with warnings treated as failures. |
+| `npx tsc --noEmit` | Type-check without emitting files. |
+| `npm run test` | Run the Vitest suite. |
+| `npm run db:migrate` | Apply `db/schema.sql` to the configured Neon database. |

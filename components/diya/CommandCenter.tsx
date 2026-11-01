@@ -502,15 +502,15 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
             {label:"Still to run",value:remaining,detail:`${cancelled} cancelled`,icon:ListChecks,tone:"neutral"},
             {label:"Plan version",value:`v${version}`,detail:"Every decision is recorded",icon:ShieldCheck,tone:"gold"},
           ].map(({label,value,detail,icon:Icon,tone})=><article key={label} className="rounded-2xl border border-[#E5E2D9] bg-white p-4 shadow-[0_4px_16px_rgba(31,53,43,0.03)] sm:p-5">
-            <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#7D8981]">{label}</p><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${tone==="amber"?"bg-[#FFF3DB] text-[#9A6A22]":tone==="gold"?"bg-[#F8F0D9] text-[#96712D]":tone==="green"?"bg-[#E8F2E9] text-[#3D7555]":"bg-[#EFF1ED] text-[#5D6C62]"}`}><Icon size={15}/></span></div>
-            <p className="mt-3 font-display text-2xl font-extrabold tracking-tight text-[#20372D]">{value}</p><p className="mt-1 text-[10px] font-medium text-[#89938C]">{detail}</p>
+            <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#66736A]">{label}</p><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${tone==="amber"?"bg-[#FFF3DB] text-[#9A6A22]":tone==="gold"?"bg-[#F8F0D9] text-[#96712D]":tone==="green"?"bg-[#E8F2E9] text-[#3D7555]":"bg-[#EFF1ED] text-[#5D6C62]"}`}><Icon size={15}/></span></div>
+            <p className="mt-3 font-display text-2xl font-extrabold tracking-tight text-[#20372D]">{value}</p><p className="mt-1 text-[10px] font-medium text-[#66736A]">{detail}</p>
           </article>)}
         </section>
 
         <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,0.8fr)]">
           <section id="run-schedule" className="scroll-mt-32 rounded-[26px] border border-[#E5E2D9] bg-white p-4 shadow-[0_8px_26px_rgba(31,53,43,0.035)] sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9A762D]">01 · Run of show</p><h2 className="mt-1 font-display text-xl font-extrabold text-[#20372D]">Today’s schedule</h2><p className="mt-1 text-xs text-[#7B877F]">Track each moment, close completed tasks, and keep owners aligned.</p></div>
+              <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">01 · Run of show</p><h2 className="mt-1 font-display text-xl font-extrabold text-[#20372D]">Today’s schedule</h2><p className="mt-1 text-xs text-[#66736A]">Track each moment, close completed tasks, and keep owners aligned.</p></div>
               <span className="rounded-full bg-[#F0F3EE] px-3 py-1.5 text-[10px] font-extrabold text-[#51645A]">{tasks.length} moments</span>
             </div>
             <div className="mt-5 flex gap-1 overflow-x-auto border-b border-[#ECEAE3] pb-2">
@@ -538,7 +538,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
                         {isDone?"Done":isCancelled?"Cancelled":isLate?"Overdue":isLive?"In progress":task.status==="in_progress"?"In progress":"Scheduled"}
                       </span>
                     </div>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#7D8981]">
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[#66736A]">
                       <span>{task.owner || "Unassigned"}</span>{task.vendorName&&<><span>·</span><span>{task.vendorName}</span></>}
                       <span>·</span><span>{task.durationMin} min</span>
                     </p>
@@ -549,7 +549,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
                   </div>}
                 </article>;
               })}
-              {filteredTasks.length===0&&<div className="py-10 text-center"><CheckCircle2 size={24} className="mx-auto text-[#69A174]"/><p className="mt-2 text-sm font-bold text-[#40564A]">Nothing in this view</p><p className="mt-1 text-xs text-[#89938C]">Try another schedule filter.</p></div>}
+              {filteredTasks.length===0&&<div className="py-10 text-center"><CheckCircle2 size={24} className="mx-auto text-[#69A174]"/><p className="mt-2 text-sm font-bold text-[#40564A]">Nothing in this view</p><p className="mt-1 text-xs text-[#66736A]">Try another schedule filter.</p></div>}
             </div>
           </section>
 
@@ -557,20 +557,20 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
             <section id="change-desk" className="scroll-mt-32 rounded-[26px] border border-[#E5E2D9] bg-white p-4 shadow-[0_8px_26px_rgba(31,53,43,0.035)] sm:p-5">
               <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F7F0DA] text-[#92702D]"><Sparkles size={16}/></span>
-                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9A762D]">02 · Change desk</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Something changed?</h2><p className="mt-1 text-[11px] leading-relaxed text-[#7B877F]">Tell Eve in plain English. Review the impact before approving any plan change.</p></div>
+                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">02 · Change desk</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Something changed?</h2><p className="mt-1 text-[11px] leading-relaxed text-[#66736A]">Tell Eve in plain English. Review the impact before approving any plan change.</p></div>
               </div>
               <label htmlFor="run-change-input" className="sr-only">Describe what changed</label>
               <textarea id="run-change-input" value={input} onChange={(event)=>setInput(event.target.value)} maxLength={1200} rows={3}
                 placeholder="Caterer is 40 minutes late and 30 more guests are coming…"
-                className="mt-4 min-h-[92px] w-full resize-y rounded-2xl border border-[#E1DED4] bg-[#FCFBF8] px-3.5 py-3 text-sm text-[#263B32] outline-none transition placeholder:text-[#A2AAA3] focus:border-[#B99243] focus:ring-2 focus:ring-[#B99243]/15"/>
+                className="mt-4 min-h-[92px] w-full resize-y rounded-2xl border border-[#E1DED4] bg-[#FCFBF8] px-3.5 py-3 text-sm text-[#263B32] outline-none transition placeholder:text-[#66736A] focus:border-[#B99243] focus:ring-2 focus:ring-[#B99243]/15"/>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[10px] text-[#8B958E]">{input.length}/1200 · One or more updates are okay</span>
+                <span className="text-[10px] text-[#66736A]">{input.length}/1200 · One or more updates are okay</span>
                 <button disabled={busy||!input.trim()} onClick={submitText} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#17483B] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition hover:bg-[#10392E] disabled:cursor-not-allowed disabled:opacity-45">
                   {busy?<><RefreshCw size={13} className="animate-spin"/>Analyzing</>:<>Review change <ArrowRight size={13}/></>}
                 </button>
               </div>
               <div className="mt-4 border-t border-[#EEECE5] pt-4">
-                <div className="flex items-center justify-between gap-2"><p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#858F88]">Quick actions</p>{selectedTask&&<span className="max-w-[65%] truncate text-[9px] font-semibold text-[#68766D]">For: {selectedTask.task}</span>}</div>
+                <div className="flex items-center justify-between gap-2"><p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#66736A]">Quick actions</p>{selectedTask&&<span className="max-w-[65%] truncate text-[9px] font-semibold text-[#68766D]">For: {selectedTask.task}</span>}</div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <button disabled={!selectedTask||busy} onClick={()=>selectedTask&&quickAction("delay-15",selectedTask.id)} className="rounded-xl border border-[#E7E5DD] px-3 py-2.5 text-[10px] font-extrabold text-[#40564A] transition hover:border-[#BDCEBF] hover:bg-[#F4F7F2] disabled:opacity-40">Delay +15 min</button>
                   <button disabled={!selectedTask||busy} onClick={()=>selectedTask&&quickAction("delay-30",selectedTask.id)} className="rounded-xl border border-[#E7E5DD] px-3 py-2.5 text-[10px] font-extrabold text-[#40564A] transition hover:border-[#BDCEBF] hover:bg-[#F4F7F2] disabled:opacity-40">Delay +30 min</button>
@@ -589,10 +589,10 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
 
             <section id="plan-b" className="scroll-mt-32 rounded-[26px] border border-[#E5E2D9] bg-white p-4 shadow-[0_8px_26px_rgba(31,53,43,0.035)] sm:p-5">
               <div className="flex items-start justify-between gap-3">
-                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9A762D]">03 · Prepared contingencies</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Plan B is ready</h2></div>
+                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">03 · Prepared contingencies</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Plan B is ready</h2></div>
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F7F0DA] text-[#92702D]"><ShieldCheck size={16}/></span>
               </div>
-              <p className="mt-1 text-[10px] leading-relaxed text-[#7B877F]">When a risk happens, Eve surfaces the prepared response before generating new options.</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-[#66736A]">When a risk happens, Eve surfaces the prepared response before generating new options.</p>
               <div className="mt-3 space-y-2">
                 {riskList.slice(0,4).map((risk)=><article key={risk.id??risk.title} className="rounded-xl border border-[#EFEEE8] bg-[#FBFAF7] p-3">
                   <div className="flex items-start justify-between gap-2"><div><p className="text-[11px] font-extrabold text-[#34483F]">{risk.title}</p><p className="mt-1 text-[9px] font-semibold capitalize text-[#849087]">{risk.triggerType.replaceAll("_"," ").toLowerCase()} · {risk.likelihood} likelihood</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-extrabold uppercase ${risk.status==="triggered"?"bg-[#FFF0D6] text-[#936421]":"bg-[#E9F2E9] text-[#3E7250]"}`}>{risk.status??"ready"}</span></div>
@@ -604,10 +604,10 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
 
             <section id="team-links" className="scroll-mt-32 rounded-[26px] border border-[#E5E2D9] bg-white p-4 shadow-[0_8px_26px_rgba(31,53,43,0.035)] sm:p-5">
               <div className="flex items-start justify-between gap-3">
-                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9A762D]">04 · Team coordination</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Owner links</h2></div>
+                <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">04 · Team coordination</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#20372D]">Owner links</h2></div>
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EDF3EA] text-[#477153]"><Users size={16}/></span>
               </div>
-              <p className="mt-1 text-[10px] leading-relaxed text-[#7B877F]">Share a private task-only link. Owners can check their assignments and report progress.</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-[#66736A]">Share a private task-only link. Owners can check their assignments and report progress.</p>
               <div className="mt-3 space-y-2">
                 {ownerLinks.map((link)=>{
                   const taskLabels=tasks.filter((task)=>link.task_ids.includes(task.id)).map((task)=>task.task);
@@ -626,7 +626,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
         <AnimatePresence>
           {proposal&&<motion.section id="change-review" initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} className="mt-5 scroll-mt-32 rounded-[26px] border border-[#DCCB9D] bg-[#FFFEFA] p-4 shadow-[0_12px_36px_rgba(120,94,41,0.09)] sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9A762D]">05 · Impact review · {proposal.impact.severity} impact</p><h2 className="mt-1 font-display text-xl font-extrabold text-[#20372D]">Choose how to handle this change</h2><p className="mt-1 text-xs text-[#7B877F]">Nothing is changed until you approve a verified option.</p></div>
+              <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">05 · Impact review · {proposal.impact.severity} impact</p><h2 className="mt-1 font-display text-xl font-extrabold text-[#20372D]">Choose how to handle this change</h2><p className="mt-1 text-xs text-[#66736A]">Nothing is changed until you approve a verified option.</p></div>
               <button onClick={()=>setProposal(null)} className="rounded-xl border border-[#E5E1D5] px-3 py-2 text-[10px] font-extrabold text-[#647168] hover:bg-[#F5F3EC]">Reject all</button>
             </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -634,9 +634,9 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
                 const beforeTasks=new Map(plan.timeline.map((task)=>[task.id,task]));
                 return <article key={`${option.title}-${index}`} className={`rounded-2xl border bg-white p-4 sm:p-5 ${index===0?"border-[#BFD0BF] shadow-[0_6px_20px_rgba(45,90,58,0.07)]":"border-[#E8E5DC]"}`}>
                   <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-[0.15em] text-[#8A948C]">Option {index+1}{index===0?" · Recommended":""}</p><h3 className="mt-1 text-sm font-extrabold text-[#283D33]">{option.title}</h3></div><span className="rounded-full bg-[#E8F2E9] px-2.5 py-1 text-[9px] font-extrabold text-[#3F7551]"><CheckCircle2 size={10} className="mr-1 inline"/>Verified</span></div>
-                  <p className={`mt-3 text-sm font-extrabold ${option.rupeeImpact>0?"text-[#A24C3D]":"text-[#315C4C]"}`}>{option.rupeeImpact>0?"+":option.rupeeImpact<0?"−":"±"}₹{Math.abs(option.rupeeImpact).toLocaleString("en-IN")} <span className="text-[10px] font-semibold text-[#7B877F]">{option.rupeeImpact<0?"estimated savings":"estimated budget impact"}</span></p>
+                  <p className={`mt-3 text-sm font-extrabold ${option.rupeeImpact>0?"text-[#A24C3D]":"text-[#315C4C]"}`}>{option.rupeeImpact>0?"+":option.rupeeImpact<0?"−":"±"}₹{Math.abs(option.rupeeImpact).toLocaleString("en-IN")} <span className="text-[10px] font-semibold text-[#66736A]">{option.rupeeImpact<0?"estimated savings":"estimated budget impact"}</span></p>
                   <div className="mt-3 rounded-xl bg-[#F7F7F2] p-3">
-                    <p className="text-[9px] font-extrabold uppercase tracking-wide text-[#89938C]">Schedule impact</p>
+                    <p className="text-[9px] font-extrabold uppercase tracking-wide text-[#66736A]">Schedule impact</p>
                     <div className="mt-2 space-y-2">
                       {option.report.newTimes.slice(0,4).map((change)=>{
                         const task=beforeTasks.get(change.taskId);
@@ -644,10 +644,10 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
                         return <p key={change.taskId} className="flex items-center justify-between gap-2 text-[10px]"><span className="min-w-0 truncate font-semibold text-[#52645A]">{task?.task}</span><span className="shrink-0 tabular-nums text-[#6D7B71]">{formatTaskTime(change.before)} <ArrowRight size={10} className="mx-1 inline"/> <strong className="text-[#315C4C]">{updated?formatTaskTime(updated.startAt):formatTaskTime(change.after)}</strong></span></p>;
                       })}
                       {option.report.newTimes.length===0&&option.report.affectedTasks.slice(0,3).map((task)=><p key={task.id} className="text-[10px] font-semibold text-[#52645A]">Affected · {task.task}</p>)}
-                      {option.report.affectedTasks.length===0&&<p className="text-[10px] text-[#7B877F]">No other tasks move.</p>}
+                      {option.report.affectedTasks.length===0&&<p className="text-[10px] text-[#66736A]">No other tasks move.</p>}
                     </div>
                   </div>
-                  <ul className="mt-3 space-y-1.5 text-[10px] leading-relaxed text-[#627168]">{option.tradeoffs.map((tradeoff)=><li key={tradeoff} className="flex gap-2"><span className="text-[#9A762D]">•</span><span>{tradeoff}</span></li>)}</ul>
+                  <ul className="mt-3 space-y-1.5 text-[10px] leading-relaxed text-[#627168]">{option.tradeoffs.map((tradeoff)=><li key={tradeoff} className="flex gap-2"><span className="text-[#765D2E]">•</span><span>{tradeoff}</span></li>)}</ul>
                   <button disabled={busy} onClick={()=>void approve(index)} className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-xs font-extrabold transition disabled:opacity-50 ${index===0?"bg-[#17483B] text-white hover:bg-[#10392E]":"border border-[#DCE3D9] bg-[#F7FAF6] text-[#315C4C] hover:bg-[#EDF4EB]"}`}>Approve option {index+1}<ArrowRight size={13}/></button>
                 </article>;
               })}
@@ -665,13 +665,13 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
 
         <section id="audit-trail" className="mt-5 scroll-mt-32 rounded-[26px] border border-[#E5E2D9] bg-white p-4 shadow-[0_8px_26px_rgba(31,53,43,0.035)] sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#9A762D]">07 · Decisions and accountability</p><h2 className="mt-1 font-display text-xl font-extrabold text-[#20372D]">Event activity</h2><p className="mt-1 text-xs text-[#7B877F]">A permanent timeline of updates, approvals, and owner coordination.</p></div>
+            <div><p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#765D2E]">07 · Decisions and accountability</p><h2 className="mt-1 font-display text-xl font-extrabold text-[#20372D]">Event activity</h2><p className="mt-1 text-xs text-[#66736A]">A permanent timeline of updates, approvals, and owner coordination.</p></div>
             {version>1&&<button disabled={busy} onClick={()=>void revert()} className="inline-flex items-center gap-2 rounded-xl border border-[#E2E0D7] px-3 py-2.5 text-[10px] font-extrabold text-[#52645A] transition hover:bg-[#F7F6F1] disabled:opacity-50"><RotateCcw size={12}/>Revert to previous version</button>}
           </div>
           <ol className="mt-5 space-y-0">
             {audit.slice(-8).reverse().map((entry,index)=><li key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
               <div className="flex w-7 shrink-0 flex-col items-center"><span className={`z-10 flex h-7 w-7 items-center justify-center rounded-full ${index===0?"bg-[#E8F2E9] text-[#3F7551]":"bg-[#F1F2ED] text-[#77847A]"}`}>{entry.type==="APPLIED"?<Check size={13}/>:entry.type==="CLARIFICATION"?<Sparkles size={12}/>:<Activity size={12}/>}</span>{index<audit.slice(-8).length-1&&<span className="mt-1 w-px flex-1 bg-[#E8EAE3]"/>}</div>
-              <div className="min-w-0 flex-1 rounded-xl bg-[#FBFAF7] px-3.5 py-3"><p className="text-xs font-bold leading-relaxed text-[#34483F]">{auditText(entry)}</p><p className="mt-1 text-[9px] font-medium text-[#89938C]">{new Date(entry.created_at).toLocaleString()} · {entry.actor}</p></div>
+              <div className="min-w-0 flex-1 rounded-xl bg-[#FBFAF7] px-3.5 py-3"><p className="text-xs font-bold leading-relaxed text-[#34483F]">{auditText(entry)}</p><p className="mt-1 text-[9px] font-medium text-[#66736A]">{new Date(entry.created_at).toLocaleString()} · {entry.actor}</p></div>
             </li>)}
             {audit.length===0&&<li className="rounded-xl bg-[#FBFAF7] p-4 text-xs text-[#849087]">Your event decisions will appear here as the team reports updates.</li>}
           </ol>
@@ -683,7 +683,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
             <article className="rounded-2xl border border-[#E5E9DF] bg-white p-4"><p className="text-[9px] font-extrabold uppercase tracking-wide text-[#829087]">Budget closeout</p><p className="mt-2 text-xs text-[#52645A]">Planned <strong className="text-[#263B32]">₹{summary.plannedBudget.toLocaleString("en-IN")}</strong></p><p className="mt-1 text-xs text-[#52645A]">Actual <strong className="text-[#263B32]">₹{summary.actualBudget.toLocaleString("en-IN")}</strong></p></article>
             <article className="rounded-2xl border border-[#E5E9DF] bg-white p-4"><p className="text-[9px] font-extrabold uppercase tracking-wide text-[#829087]">Execution</p><p className="mt-2 text-xs text-[#52645A]">On time <strong>{summary.tasksOnTime}</strong> · Delayed <strong>{summary.tasksDelayed}</strong> · Pending <strong>{summary.tasksPending}</strong></p><p className="mt-1 text-xs text-[#52645A]">Changes handled <strong>{summary.changesHandled}</strong></p></article>
             <article className="rounded-2xl border border-[#E5E9DF] bg-white p-4 sm:col-span-2"><p className="text-[9px] font-extrabold uppercase tracking-wide text-[#829087]">What to remember</p><ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-[#52645A]">{summary.lessons.map((lesson)=><li key={lesson}>• {lesson}</li>)}</ul></article>
-            <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row"><input value={templateName} onChange={(event)=>setTemplateName(event.target.value)} maxLength={80} placeholder="Name this event template" className="min-w-0 flex-1 rounded-xl border border-[#DCD6C8] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#A77D2B]"/><button disabled={busy||templateName.trim().length<2||templateSaved} onClick={()=>void saveTemplate()} className="rounded-xl border border-[#A77D2B]/40 bg-white px-4 py-2.5 text-xs font-extrabold text-[#765D2E] disabled:opacity-50">{templateSaved?"Template saved":"Save as template"}</button></div>
+            <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row"><label htmlFor="event-template-name" className="sr-only">Name this event template</label><input id="event-template-name" value={templateName} onChange={(event)=>setTemplateName(event.target.value)} maxLength={80} placeholder="Name this event template" className="min-w-0 flex-1 rounded-xl border border-[#DCD6C8] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#A77D2B]"/><button disabled={busy||templateName.trim().length<2||templateSaved} onClick={()=>void saveTemplate()} className="rounded-xl border border-[#A77D2B]/40 bg-white px-4 py-2.5 text-xs font-extrabold text-[#765D2E] disabled:opacity-50">{templateSaved?"Template saved":"Save as template"}</button></div>
           </div>}
         </section>}
 

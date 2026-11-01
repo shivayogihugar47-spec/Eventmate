@@ -10,7 +10,7 @@ export default function NotFound() {
         <p className="text-sm font-bold text-[#374151] mt-2">
           Even Diya couldn&apos;t find this page.
         </p>
-        <p className="text-sm text-[#9CA3AF] mt-1">
+        <p className="text-sm text-[#66736A] mt-1">
           I checked under the mandap, behind the DJ and inside the laddoo box. Nothing.
         </p>
       </div>

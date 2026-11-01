@@ -120,7 +120,7 @@ export function LightTheLamp({ onLit }: Props) {
           <motion.p
             key="igniting"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="text-sm font-bold text-[#F59E0B] tracking-wide">
+            className="text-sm font-bold text-[#765D2E] tracking-wide">
             Igniting the flame…
           </motion.p>
         )}
@@ -128,13 +128,13 @@ export function LightTheLamp({ onLit }: Props) {
           <motion.p
             key="lit"
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-            className="text-sm font-bold text-[#F59E0B] tracking-wide">
+            className="text-sm font-bold text-[#765D2E] tracking-wide">
             Welcome — taking you in…
           </motion.p>
         )}
       </AnimatePresence>
 
-      <p className="text-sm text-[#9CA3AF] text-center max-w-xs">
+      <p className="text-sm text-[#66736A] text-center max-w-xs">
         Click or hold to begin your planning journey
       </p>
     </div>

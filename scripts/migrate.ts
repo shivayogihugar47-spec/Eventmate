@@ -96,17 +96,17 @@ async function main() {
   const schemaPath = join(process.cwd(), "db", "schema.sql");
   const sql = neon(databaseUrl);
 
-  console.log("📂  Reading schema from", schemaPath);
+  console.info("📂  Reading schema from", schemaPath);
   const schemaSql = readFileSync(schemaPath, "utf-8");
 
   const statements = splitSqlStatements(schemaSql);
 
-  console.log(`🚀  Running ${statements.length} statement(s) against Neon …`);
+  console.info(`🚀  Running ${statements.length} statement(s) against Neon …`);
   for (const statement of statements) {
     await sql.query(statement);
   }
 
-  console.log("✅  Migration complete.");
+  console.info("✅  Migration complete.");
 }
 
 main().catch((err) => {

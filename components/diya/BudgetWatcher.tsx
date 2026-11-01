@@ -31,7 +31,7 @@ export function BudgetWatcher({ budget, spent }: { budget: number; spent: number
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-sm font-extrabold" style={{ color }}>{Math.round(pct)}%</span>
-          <span className="text-[9px] font-semibold text-[#9CA3AF]">used</span>
+          <span className="text-[9px] font-semibold text-[#66736A]">used</span>
         </div>
       </div>
 

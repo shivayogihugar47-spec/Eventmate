@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { useDiya } from "@/lib/diyaStore";
-import { Diya, preloadDiya } from "@/components/diya/Diya";
+
+const Diya = dynamic(() => import("@/components/diya/Diya").then((module) => module.Diya), { ssr: false });
 
 const FloatingDiya = dynamic(
   () => import("@/components/diya/FloatingDiya").then(m => m.FloatingDiya),
@@ -39,11 +40,8 @@ function DiyaRun({ active }: { active: boolean }) {
   );
 }
 
-export function ClientProviders() {
+export function ClientProviders({ children }: { children: React.ReactNode }) {
   const { mascotPref, say, isRunning } = useDiya();
-
-  // Preload all Diya moods on app start.
-  useEffect(() => { preloadDiya(); }, []);
 
   // Greet once on first load.
   useEffect(() => {
@@ -66,10 +64,11 @@ export function ClientProviders() {
   }, [say]);
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
+      {children}
       <FloatingDiya />
       <DiyaRun active={isRunning} />
       {mascotPref === "on" && <CursorSparks />}
-    </>
+    </MotionConfig>
   );
 }

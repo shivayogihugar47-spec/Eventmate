@@ -13,7 +13,7 @@ export function DiyaSkeleton({ label = "Fetching the good stuff…" }: { label?:
       >
         <Diya size={84} moodOverride="thinking" />
       </motion.div>
-      <p className="text-sm font-semibold text-[#9CA3AF] italic">{label}</p>
+      <p className="text-sm font-semibold text-[#66736A] italic">{label}</p>
       <div className="w-full max-w-sm space-y-2.5">
         {[100, 82, 64].map((w, i) => (
           <div key={i} className="h-3 rounded-full shimmer" style={{ width: `${w}%` }} />

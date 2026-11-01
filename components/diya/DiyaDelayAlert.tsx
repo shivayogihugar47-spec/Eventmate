@@ -67,7 +67,7 @@ export function DiyaDelayAlert({
             {phase === "thinking" && <>🔄 Cascading the timeline…</>}
             {phase === "celebrate" && <>✅ Timeline fixed — back on schedule!</>}
           </p>
-          <p className="text-[10px] text-[#9CA3AF] mt-1">
+          <p className="text-[10px] text-[#66736A] mt-1">
             {phase === "worried" ? "Diya is on it"
               : phase === "thinking" ? "Shifting dependent tasks"
               : "Nice save!"}

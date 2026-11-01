@@ -27,6 +27,9 @@ export function DiyaSpeechBubble({ side = "right", className = "" }: Props) {
           exit={{ opacity: 0, scale: 0.88 }}
           transition={{ type: "spring", stiffness: 320, damping: 24 }}
           className={`relative bg-white border border-[#E5E7EB] rounded-2xl px-3.5 py-2.5 shadow-lg max-w-[200px] z-50 ${className}`}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
         >
           <TypewriterText text={speech} />
           <div className={tailClass} />

@@ -38,7 +38,7 @@ export function DiyaBillScanner({
             transition={{ type: "spring", stiffness: 280, damping: 24 }}
             className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 relative"
           >
-            <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 text-[#9CA3AF] hover:text-[#374151]">
+            <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 text-[#66736A] hover:text-[#374151]">
               <X size={16} />
             </button>
 
@@ -48,7 +48,7 @@ export function DiyaBillScanner({
                 <p className="text-sm font-extrabold text-[#111827]">
                   {done ? "Got it!" : "Scanning…"}
                 </p>
-                <p className="text-xs text-[#9CA3AF] mt-0.5">
+                <p className="text-xs text-[#66736A] mt-0.5">
                   {done ? "Read the bill in one go." : "Hold steady, I'm reading the bill."}
                 </p>
               </div>

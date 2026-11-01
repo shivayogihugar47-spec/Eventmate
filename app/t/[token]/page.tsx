@@ -132,15 +132,15 @@ export default function OwnerTasksPage() {
         </header>
 
         {error && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-        {!data && !error && <p className="rounded-2xl bg-white p-5 text-sm text-[#68796F]">Loading your tasks…</p>}
+        {!data && !error && <p className="rounded-2xl bg-white p-5 text-sm text-[#66736A]">Loading your tasks…</p>}
         {data && (
           <div className="space-y-3">
             {data.tasks.map((task) => (
               <motion.article key={task.id} layout className="rounded-2xl border border-[#E6E0D3] bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className={`font-display text-sm font-extrabold ${task.status === "done" ? "text-[#68796F] line-through" : "text-[#263B32]"}`}>{task.task}</p>
-                    <p className="mt-1 flex items-center gap-1 text-xs text-[#68796F]"><Clock size={12} />{task.time} · {task.durationMin} min</p>
+                    <p className={`font-display text-sm font-extrabold ${task.status === "done" ? "text-[#66736A] line-through" : "text-[#263B32]"}`}>{task.task}</p>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-[#66736A]"><Clock size={12} />{task.time} · {task.durationMin} min</p>
                   </div>
                   <span className="rounded-full bg-[#F4F1E8] px-2.5 py-1 text-[10px] font-bold uppercase text-[#52645A]">{task.status}</span>
                 </div>
@@ -158,7 +158,7 @@ export default function OwnerTasksPage() {
                 )}
               </motion.article>
             ))}
-            {data.tasks.length === 0 && <p className="rounded-2xl bg-white p-5 text-sm text-[#68796F]">No tasks are assigned to this link.</p>}
+            {data.tasks.length === 0 && <p className="rounded-2xl bg-white p-5 text-sm text-[#66736A]">No tasks are assigned to this link.</p>}
           </div>
         )}
 
@@ -170,11 +170,11 @@ export default function OwnerTasksPage() {
                 <button key={`${option.title}-${index}`} disabled={Boolean(busy)} onClick={() => approveOption(index)}
                   className="w-full rounded-xl border border-[#E6E0D3] bg-white p-3 text-left transition hover:border-[#A77D2B]/60 disabled:opacity-50">
                   <span className="block text-xs font-bold text-[#263B32]">{option.title}</span>
-                  <span className="mt-1 block text-[11px] text-[#68796F]">{option.tradeoffs.join(" · ")}</span>
+                  <span className="mt-1 block text-[11px] text-[#66736A]">{option.tradeoffs.join(" · ")}</span>
                 </button>
               ))}
             </div>
-            <button onClick={() => setProposal(null)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#68796F]"><RotateCcw size={12} /> Cancel</button>
+            <button onClick={() => setProposal(null)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#66736A]"><RotateCcw size={12} /> Cancel</button>
           </section>
         )}
       </div>

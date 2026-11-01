@@ -23,7 +23,7 @@ export function DiyaEmptyState({ message = "Nothing here yet", submessage = "Eve
       </motion.div>
       <div>
         <p className="text-base font-bold text-[#374151]">{message}</p>
-        <p className="text-sm text-[#9CA3AF] mt-1 max-w-xs">{submessage}</p>
+        <p className="text-sm text-[#66736A] mt-1 max-w-xs">{submessage}</p>
       </div>
     </motion.div>
   );
