@@ -20,7 +20,7 @@ describe("parseJsonBody", () => {
 
   it("rejects malformed JSON and schema violations", async () => {
     const malformed = await parseJsonBody(createRequest("{"), schema);
-    const invalid = await parseJsonBody(createRequest('{"name":"Jashn Planner"}'), schema);
+    const invalid = await parseJsonBody(createRequest('{"name":"Eve Planner"}'), schema);
     expect(malformed).toMatchObject({ success: false, status: 400 });
     expect(invalid).toMatchObject({ success: false, status: 400 });
   });

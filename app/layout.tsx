@@ -4,30 +4,30 @@ import { ClientProviders } from "./ClientProviders";
 
 export const metadata: Metadata = {
   metadataBase: new URL(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL ?? "localhost:3000"}`),
-  title: "Jashn — Plans your celebration. Runs it too.",
-  description: "Plans your celebration. Runs it too. Jashn helps you create and manage weddings, birthdays, and every event in between.",
-  applicationName: "Jashn",
+  title: "Eve — Plans your celebration. Runs it too.",
+  description: "Plans your celebration. Runs it too. Eve helps you create and manage weddings, birthdays, and every event in between.",
+  applicationName: "Eve",
   icons: {
-    icon: "/brand/jashn-icon.png",
-    apple: "/brand/jashn-icon.png",
+    icon: "/brand/eve-icon.svg",
+    apple: "/brand/eve-icon.svg",
   },
   openGraph: {
     type: "website",
-    siteName: "Jashn",
-    title: "Jashn — Plans your celebration. Runs it too.",
-    description: "Plans your celebration. Runs it too. Plan the day, budget, vendors, and event operations with Jashn.",
+    siteName: "Eve",
+    title: "Eve — Plans your celebration. Runs it too.",
+    description: "Plans your celebration. Runs it too. Plan the day, budget, vendors, and event operations with Eve.",
     images: [
       {
-        url: "/jashn-logo.png",
-        alt: "Jashn — Plans your celebration. Runs it too.",
+        url: "/eve-logo.svg",
+        alt: "Eve — Plans your celebration. Runs it too.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Jashn — Plans your celebration. Runs it too.",
-    description: "Plans your celebration. Runs it too. Plan the day, budget, vendors, and event operations with Jashn.",
-    images: ["/jashn-logo.png"],
+    title: "Eve — Plans your celebration. Runs it too.",
+    description: "Plans your celebration. Runs it too. Plan the day, budget, vendors, and event operations with Eve.",
+    images: ["/eve-logo.svg"],
   },
 };
 

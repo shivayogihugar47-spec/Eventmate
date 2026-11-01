@@ -448,7 +448,7 @@ export function CommandCenter({ eventId, organizerToken, plan: initialPlan, onBa
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#17483B] text-[#F5CA70]"><PartyPopper size={17}/></span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold tracking-tight text-[#18392E]">Jashn <span className="font-medium text-[#89958D]">/ Event operations</span></p>
+              <p className="truncate text-sm font-extrabold tracking-tight text-[#18392E]">Eve <span className="font-medium text-[#89958D]">/ Event operations</span></p>
               <p className="text-[10px] font-semibold text-[#748178]">RUN OF SHOW · VERSION {version}</p>
             </div>
             <span className={`ml-1 hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold sm:inline-flex ${isOnline && !isError ? "bg-[#E5F0E7] text-[#35644D]" : "bg-amber-100 text-amber-900"}`}>

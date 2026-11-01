@@ -491,7 +491,7 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
               </a>
             ))}
             </div>
-          <p className="text-[11px] leading-relaxed text-[#66736A]">Search links open external websites. Jashn does not fetch or verify their listings; confirm vendor details directly.</p>
+          <p className="text-[11px] leading-relaxed text-[#66736A]">Search links open external websites. Eve does not fetch or verify their listings; confirm vendor details directly.</p>
         </>
       )}
     </div>
@@ -573,7 +573,7 @@ function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>vo
               <Sparkles size={16}/>
             </span>
             <div>
-              <p className="font-display text-sm font-extrabold text-[#214E43]">Jashn</p>
+              <p className="font-display text-sm font-extrabold text-[#214E43]">Eve</p>
               <p className="text-[10px] font-medium text-[#7D877F]">Your event workspace</p>
             </div>
           </div>
@@ -796,8 +796,8 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
       <nav className="relative z-20 flex items-center justify-between px-5 py-4 sm:px-8 sm:py-5 max-w-7xl mx-auto">
         <div className="flex items-center gap-3">
           <Image
-            src="/jashn-logo.png"
-            alt="Jashn — Plans your celebration. Runs it too."
+            src="/eve-logo.svg"
+            alt="Eve — Plans your celebration. Runs it too."
             width={560}
             height={180}
             priority
@@ -1295,7 +1295,7 @@ function EventStudio({ initialType, initialLabel, onBack, onEventSaved }:{ initi
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#173F35] shadow-[0_2px_6px_rgba(23,63,53,0.18)]">
             <Sparkles size={15} className="text-[#F0D38C]"/>
           </div>
-          <span className="font-display font-extrabold text-[#173F35]">Jashn</span>
+          <span className="font-display font-extrabold text-[#173F35]">Eve</span>
         </div>
 
         {/* Progress bar */}

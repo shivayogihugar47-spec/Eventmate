@@ -125,7 +125,7 @@ export default function OwnerTasksPage() {
         <header className="mb-6 flex items-center gap-4 rounded-3xl bg-[#173F35] p-5 text-white">
           <Diya size={68} moodOverride={error ? "worried" : "greet"} />
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#F0D38C]">Jashn · owner link</p>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#F0D38C]">Eve · owner link</p>
             <h1 className="mt-1 font-display text-xl font-extrabold">Your event tasks</h1>
             {data && <p className="mt-1 text-xs text-[#D8E5DC]">{data.eventType} · {data.eventDate}</p>}
           </div>
