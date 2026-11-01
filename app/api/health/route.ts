@@ -1,10 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { openrouter } from "@/lib/llm";
+import { llmJson } from "@/lib/llm";
 import { sql } from "@/lib/db";
 import { authConfig } from "@/lib/auth";
 import { callHello } from "@/lib/functions";
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // GET /api/health
@@ -42,15 +43,11 @@ export async function GET() {
 
   // ── 1. OpenRouter ─────────────────────────────────────────────────────────
   try {
-    const model =
-      process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free";
-    const response = await openrouter.chat.completions.create({
-      model,
-      messages: [{ role: "user", content: 'Reply with the single word "ok".' }],
-      max_tokens: 5,
-    });
-    const content = response.choices[0]?.message?.content ?? "";
-    if (!content) throw new Error("Empty response from OpenRouter.");
+    await llmJson(
+      'Confirm the health probe by returning exactly {"status":"ok"}.',
+      [{ role: "user", content: 'Reply with status "ok".' }],
+      z.object({ status: z.literal("ok") }),
+    );
   } catch (err) {
     report.openrouter = {
       status: "error",

@@ -48,6 +48,29 @@ eventmate-live/
 └── neon.ts                     # Neon project config (auth, functions, branches)
 ```
 
+## RUN architecture
+
+RUN starts when an organizer locks a generated plan. The plan is saved as version 1, with prepared risks, task records, expiring owner links, and an append-only audit entry. Event-day changes do not regenerate the plan: they go through this pipeline:
+
+```text
+CHANGE -> INTAKE -> IMPACT ENGINE -> OPTION GENERATOR -> VERIFIER
+       -> APPROVAL -> APPLY -> NOTIFY -> AUDIT
+```
+
+| Stage | AI or plain code? | Responsibility |
+|---|---|---|
+| Intake | AI (`llmJson`, Zod validated) | Converts a free-text update into one or more typed changes; asks one clarifying question when needed. Quick actions use plain code. |
+| Prepared risks | AI (`llmJson`, Zod validated) | Creates five event-specific risks and structured contingency operations when the plan is locked. A matching contingency is offered before generating new options. |
+| Impact | Plain TypeScript | Computes downstream effects, task timing, critical path/slack, budget deltas, and hard-constraint violations. |
+| Options | AI (`llmJson`, Zod validated) | Proposes ranked structured operations and tradeoffs; it cannot edit the plan. |
+| Verification | Plain TypeScript | Applies each proposal to a copy, reruns impact/constraint checks, and removes unsafe options. |
+| Approval and apply | Plain TypeScript + database transaction | The organizer selects a verified option. Version checks reject stale approvals; an idempotency key protects retries. Applying creates a new plan snapshot and audit event. |
+| Owner messages | AI (`llmJson`, Zod validated) | Drafts short task updates for organizers to copy or open in WhatsApp; messages are never auto-sent. |
+| Scheduling and live state | Plain TypeScript + database | Computes Now/Next from task state and the clock; SWR refreshes the Command Center every three seconds. |
+| Audit | Plain TypeScript + database | Stores append-only change, apply, notification, and template events for the timeline. |
+
+Task owners use expiring, unguessable links scoped to their assigned tasks. Their Done and Delay actions use the same event versioning and verification rules. If the network drops, organizer updates are queued locally and retried after reconnecting.
+
 ---
 
 ## Manual Setup Steps

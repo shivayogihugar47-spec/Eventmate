@@ -57,7 +57,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid #A77D2B;
   outline-offset: 2px;
 }
 

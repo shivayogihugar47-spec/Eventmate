@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { getOpenRouterClient } from "@/lib/llm";
+import { llmJson } from "@/lib/llm";
+import { z } from "zod";
 import { normalizeBudgetAmounts, parseBudget } from "@/lib/budget";
 import { buildNextEventQuestion, type EventChatMessage } from "@/lib/eventQuestions";
+import { normalizePlanForRun } from "@/lib/run/plan";
+import { generateRisks } from "@/lib/run/risks";
+import { saveLockedRun } from "@/lib/run/security";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +31,8 @@ export interface EventPlan {
 }
 export interface TimelineItem {
   time: string; task: string; owner: string; description?: string;
-  status: "pending" | "in_progress" | "done"; icon: string;
+  status: "pending" | "in_progress" | "done" | "cancelled"; icon: string;
+  id?: string; startAt?: string; durationMin?: number; dependsOn?: string[]; vendorName?: string; actualAt?: string;
 }
 export interface BudgetItem {
   category: string; allocated: number; percentage: number; icon: string; notes?: string;
@@ -40,6 +45,51 @@ export interface VendorItem {
 export interface ChecklistItem {
   task: string; dueDate: string; done: boolean; icon: string; category?: string;
 }
+
+const GeneratedPlanSchema = z.object({
+  eventType: z.string().min(1).max(80),
+  eventDate: z.string().min(1).max(40),
+  guestCount: z.number().int().min(0).max(100_000),
+  city: z.string().min(1).max(120),
+  budgetTotal: z.number().int().min(1).max(1_000_000_000),
+  theme: z.string().max(120).optional(),
+  venueStyle: z.string().max(120).optional(),
+  cateringType: z.string().max(120).optional(),
+  specialRequirements: z.string().max(2000).optional(),
+  eventDetails: z.record(z.string(), z.string()).optional(),
+  highlights: z.array(z.string().max(240)).length(4),
+  timeline: z.array(z.object({
+    time: z.string().min(1).max(40),
+    task: z.string().min(1).max(160),
+    owner: z.string().max(120),
+    description: z.string().max(500).optional(),
+    status: z.enum(["pending", "in_progress", "done", "cancelled"]),
+    icon: z.string().max(80),
+  })).length(12),
+  budgetBreakdown: z.array(z.object({
+    category: z.string().min(1).max(120),
+    allocated: z.number().int().min(0).max(1_000_000_000),
+    percentage: z.number().min(0).max(100),
+    icon: z.string().max(80),
+    notes: z.string().max(500).optional(),
+  })).length(8),
+  vendors: z.array(z.object({
+    name: z.string().min(1).max(120),
+    category: z.string().min(1).max(120),
+    description: z.string().max(500).optional(),
+    status: z.enum(["pending", "contacted", "booked"]),
+    priority: z.enum(["high", "medium", "low"]),
+    icon: z.string().max(80),
+    estimatedCost: z.string().max(120).optional(),
+  })).length(10),
+  checklist: z.array(z.object({
+    task: z.string().min(1).max(160),
+    dueDate: z.string().max(120),
+    done: z.boolean(),
+    icon: z.string().max(80),
+    category: z.string().max(120).optional(),
+  })).length(12),
+});
 
 // ─── Plan generation prompt ───────────────────────────────────────────────────
 function buildPlanPrompt(d: Record<string, string | null>): string {
@@ -96,23 +146,19 @@ export async function POST(request: Request) {
     messages = body.messages ?? [];
     generatingPlan = Boolean(body.generatePlan && body.planData);
 
-    const client = getOpenRouterClient();
-    const model = process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct";
-
     // ── Plan generation mode ────────────────────────────────────────────────
     if (generatingPlan && body.planData) {
-      const res = await client.chat.completions.create({
-        model,
-        messages: [{ role: "user", content: buildPlanPrompt(body.planData) }],
-        response_format: { type: "json_object" },
-        max_tokens: 4000,
-      });
-      const raw = (res.choices[0]?.message?.content ?? "{}")
-        .replace(/^```json?\s*/i, "").replace(/\s*```$/, "").trim();
-      const plan = JSON.parse(raw) as EventPlan;
+      const plan = await llmJson(
+        "You are a professional event planner. Return a detailed plan that matches the exact JSON structure requested by the user.",
+        [{ role: "user", content: buildPlanPrompt(body.planData) }],
+        GeneratedPlanSchema,
+      );
       plan.budgetTotal = parseBudget(body.planData.budgetTotal ?? "");
       plan.budgetBreakdown = normalizeBudgetAmounts(plan.budgetBreakdown, plan.budgetTotal);
-      return NextResponse.json({ plan });
+      const runPlan = normalizePlanForRun(plan);
+      const risks = await generateRisks(runPlan);
+      const run = await saveLockedRun(runPlan, body.planData, risks);
+      return NextResponse.json({ plan: runPlan, run: { ...run, risks } });
     }
 
     return NextResponse.json(buildNextEventQuestion(messages));

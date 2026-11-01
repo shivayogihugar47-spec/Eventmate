@@ -14,6 +14,8 @@ import type { EventPlan, AssistantCard, TimelineItem, BudgetItem, VendorItem, Ch
 import { useDiya } from "@/lib/diyaStore";
 import { buildNextEventQuestion, getEventQuestionFlow, type EventCollectedData } from "@/lib/eventQuestions";
 import { formatINR } from "@/lib/budget";
+import { CommandCenter } from "@/components/diya/CommandCenter";
+import type { RunPlan } from "@/lib/run/types";
 
 // ── Dynamic imports (SSR safe) ────────────────────────────────────────────────
 const Diya    = dynamic(() => import("@/components/diya/Diya").then(m => m.Diya), { ssr: false });
@@ -465,7 +467,7 @@ const PLAN_TABS = [
 ] as const;
 type TabId = (typeof PLAN_TABS)[number]["id"];
 
-function PlanReveal({ plan, onBack }:{ plan:EventPlan; onBack:()=>void }) {
+function PlanReveal({ plan, onBack, onStartRun }:{ plan:EventPlan; onBack:()=>void; onStartRun:()=>void }) {
   const [tab, setTab] = useState<TabId>("timeline");
   const [showCelebration, setShowCelebration] = useState(false);
   const ep = EVENT_PAL[plan.eventType?.toLowerCase()] ?? PAL[0];
@@ -551,6 +553,10 @@ function PlanReveal({ plan, onBack }:{ plan:EventPlan; onBack:()=>void }) {
             {tab==="vendors"   &&<motion.div key="vd" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><VendorsSection vendors={plan.vendors}/></motion.div>}
             {tab==="checklist" &&<motion.div key="cl" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><ChecklistSection items={plan.checklist}/></motion.div>}
           </AnimatePresence>
+          <button onClick={onStartRun}
+            className="w-full mt-5 py-3 rounded-2xl bg-[#173F35] text-white text-sm font-bold hover:bg-[#245747] transition-all flex items-center justify-center gap-2">
+            <PartyPopper size={14}/> Start event day · Open Command Center
+          </button>
           <button onClick={onBack}
             className="w-full mt-8 py-3 rounded-2xl border-2 border-[#E5E7EB] text-[#9CA3AF] text-sm font-bold hover:border-[#6366F1]/40 hover:text-[#6366F1] transition-all flex items-center justify-center gap-2">
             <RotateCcw size={13}/> Plan another event
@@ -931,6 +937,8 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
   const [isGenerating, setIsGenerating] = useState(false);
   const [readyToGen, setReadyToGen]     = useState(false);
   const [plan, setPlan]                 = useState<EventPlan|null>(null);
+  const [runSession, setRunSession] = useState<{eventId:string;organizerToken:string;plan:RunPlan}|null>(null);
+  const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [history, setHistory]           = useState<{role:string;content:string}[]>([]);
 
   const { say, setMood } = useDiya();
@@ -1030,14 +1038,26 @@ function EventStudio({ initialType, initialLabel, onBack }:{ initialType?:string
       const res = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({messages:history,generatePlan:true,planData:collectedData})});
       if (!res.ok) throw new Error("Unable to generate the plan.");
-      const data = await res.json() as {plan:EventPlan};
+      const data = await res.json() as {
+        plan:RunPlan;
+        run:{eventId:string;organizerToken:string;version:number;ownerLinks:{owner:string;token:string;taskIds:string[];expiresAt:string}[]};
+      };
       setPlan(data.plan);
+      setRunSession({eventId:data.run.eventId,organizerToken:data.run.organizerToken,plan:data.plan});
     } catch {
       say("Something went wrong generating the plan. Please try again.", "worried", 4000);
     } finally { setIsGenerating(false); }
   },[readyToGen,isGenerating,history,collectedData,say]);
 
-  if (plan) return <PlanReveal plan={plan} onBack={onBack}/>;
+  if (plan && runSession && showCommandCenter) {
+    return <CommandCenter
+      eventId={runSession.eventId}
+      organizerToken={runSession.organizerToken}
+      plan={runSession.plan}
+      onBack={()=>setShowCommandCenter(false)}
+    />;
+  }
+  if (plan) return <PlanReveal plan={plan} onBack={onBack} onStartRun={()=>setShowCommandCenter(true)}/>;
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

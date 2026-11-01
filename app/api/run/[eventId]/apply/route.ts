@@ -1,0 +1,68 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { sql } from "@/lib/db";
+import { applyProposal, RunApiError } from "@/lib/run/apply";
+import { draftOwnerNotifications } from "@/lib/run/notify";
+import { consumeRateLimit, rateLimitIdentity } from "@/lib/run/security";
+
+const ApplySchema = z.object({
+  proposalId: z.string().uuid(),
+  optionIndex: z.number().int().min(0).max(2),
+  version: z.number().int().positive(),
+  idempotencyKey: z.string().min(8).max(128).regex(/^[A-Za-z0-9._:-]+$/),
+});
+
+type RouteContext = { params: { eventId: string } };
+
+export async function POST(request: Request, { params }: RouteContext) {
+  try {
+    const body = ApplySchema.parse(await request.json());
+    if (!await consumeRateLimit(`${params.eventId}:${rateLimitIdentity(request)}:apply`, 10)) {
+      return NextResponse.json({ error: "Too many apply attempts. Try again shortly." }, { status: 429 });
+    }
+    const result = await applyProposal({
+      request,
+      eventId: params.eventId,
+      proposalId: body.proposalId,
+      optionIndex: body.optionIndex,
+      expectedVersion: body.version,
+      idempotencyKey: body.idempotencyKey,
+    });
+
+    let notifications: Awaited<ReturnType<typeof draftOwnerNotifications>> = [];
+    let notificationError: string | null = null;
+    if (!result.idempotent) {
+      try {
+        notifications = await draftOwnerNotifications(
+          params.eventId,
+          result.plan,
+          result.changes,
+          result.option.report.affectedTasks.map((task) => task.id),
+        );
+        await sql`INSERT INTO plan_events (event_id, type, payload, actor)
+          VALUES (${params.eventId}, 'NOTIFY', ${JSON.stringify({
+            version: result.version,
+            taskIds: notifications.map((message) => message.taskId),
+          })}::jsonb, 'system')`;
+      } catch (error) {
+        console.error("[/api/run apply notify]", error);
+        notificationError = "The change was applied, but message drafts could not be prepared. Use Retry notifications.";
+        await sql`INSERT INTO plan_events (event_id, type, payload, actor)
+          VALUES (${params.eventId}, 'NOTIFY_FAILED', ${JSON.stringify({ version: result.version })}::jsonb, 'system')`;
+      }
+    }
+
+    return NextResponse.json({
+      version: result.version,
+      plan: result.plan,
+      idempotent: result.idempotent,
+      notifications,
+      notificationError,
+    });
+  } catch (error) {
+    if (error instanceof RunApiError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof z.ZodError) return NextResponse.json({ error: "Choose one of the verified options and retry." }, { status: 400 });
+    console.error("[/api/run apply]", error);
+    return NextResponse.json({ error: "Unable to apply this change. Your reviewed input is still available; please retry." }, { status: 503 });
+  }
+}

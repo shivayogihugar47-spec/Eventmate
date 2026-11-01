@@ -1,59 +1,59 @@
 "use client";
 
 import useSWR from "swr";
+import type { RunPlan, PlanRisk } from "@/lib/run/types";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/** Minimal shape returned by /api/events/[id] – expand as features are built. */
-export interface LiveEvent {
+export interface RunAuditEntry {
   id: string;
-  stage: string;
-  answers: Record<string, unknown>;
-  event_type: string | null;
-  event_date: string | null;
-  budget_total: number | null;
+  type: string;
+  payload: Record<string, unknown>;
+  actor: string;
   created_at: string;
 }
 
-// ---------------------------------------------------------------------------
-// Fetcher
-// ---------------------------------------------------------------------------
-
-async function fetcher(url: string): Promise<LiveEvent> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch event: ${res.status}`);
-  return res.json() as Promise<LiveEvent>;
+export interface RunSnapshot {
+  eventId: string;
+  version: number;
+  plan: RunPlan;
+  risks: PlanRisk[];
+  audit: RunAuditEntry[];
+  ownerLinks: { token: string; task_ids: string[]; expires_at: string }[];
+  event: { event_type: string; event_date: string; current_plan_version: number };
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
+async function fetcher([url, token]: [string, string]): Promise<RunSnapshot> {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error(`Unable to refresh the live plan (${response.status}).`);
+  return response.json() as Promise<RunSnapshot>;
+}
 
-/**
- * useLiveEvent – polls the event endpoint every 3 seconds via SWR.
- * No WebSockets required; the server is stateless.
- *
- * @param eventId UUID of the event to watch, or null/undefined to skip.
- *
- * TODO: Replace placeholder API path with the real route once implemented.
- */
-export function useLiveEvent(eventId: string | null | undefined) {
-  const { data, error, isLoading, mutate } = useSWR<LiveEvent>(
-    eventId ? `/api/events/${eventId}` : null,
+export function useLiveEvent(
+  eventId: string | null | undefined,
+  organizerToken: string | null | undefined,
+  initialPlan: RunPlan,
+) {
+  const { data, error, isLoading, mutate } = useSWR<RunSnapshot>(
+    eventId && organizerToken ? [`/api/run/${eventId}`, organizerToken] : null,
     fetcher,
     {
-      refreshInterval: 3000,   // poll every 3 s
+      fallbackData: eventId && organizerToken ? {
+        eventId,
+        version: 1,
+        plan: initialPlan,
+        risks: [],
+        audit: [],
+        ownerLinks: [],
+        event: {
+          event_type: initialPlan.eventType,
+          event_date: initialPlan.eventDate,
+          current_plan_version: 1,
+        },
+      } : undefined,
+      refreshInterval: 3000,
       revalidateOnFocus: true,
-    }
+      shouldRetryOnError: true,
+    },
   );
 
-  return {
-    event: data,
-    isLoading,
-    isError: !!error,
-    error,
-    refresh: mutate,
-  };
+  return { snapshot: data, isLoading, isError: Boolean(error), error, refresh: mutate };
 }

@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
-import { getOpenRouterClient } from "@/lib/llm";
+import { z } from "zod";
+import { llmJson } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
+const RequestSchema = z.object({
+  step: z.number().int().min(1).max(100),
+  answer: z.string().trim().min(1).max(500),
+  eventType: z.string().max(80).optional(),
+  city: z.string().max(120).optional(),
+});
+const CommentSchema = z.object({ comment: z.string().trim().min(1).max(240) });
+
 export async function POST(req: Request) {
   try {
-    const { step, answer, eventType, city } = await req.json() as {
-      step: number; answer: string; eventType?: string; city?: string;
-    };
-
-    const client = getOpenRouterClient();
-    const model = process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct";
+    const { step, answer, eventType, city } = RequestSchema.parse(await req.json());
 
     const context = [
       eventType ? `event: ${eventType}` : "",
@@ -31,30 +35,21 @@ export async function POST(req: Request) {
 
     const prompt = stepPrompts[step] ?? `React warmly and specifically to: "${answer}" in context of ${context}. One sentence, 12-16 words. No emojis.`;
 
-    const res = await client.chat.completions.create({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: `You are Eve, a world-class event planner AI with incredible enthusiasm and expertise. 
+    const result = await llmJson(
+      `You are Eve, a world-class event planner AI with incredible enthusiasm and expertise.
 You give SHORT, PUNCHY, SPECIFIC reactions that feel genuinely intelligent and personalized.
 Never use emojis. Never be generic. Always surprise the user with how specific and insightful you are.
-Respond with ONLY the reaction sentence — no quotes, no labels, nothing else.`,
-        },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 80,
-      temperature: 0.9,
-    });
+Return one reaction sentence in the comment JSON field.`,
+      [{ role: "user", content: prompt }],
+      CommentSchema,
+    );
 
-    const comment = (res.choices[0]?.message?.content ?? "")
-      .trim()
-      .replace(/^["']|["']$/g, "")
-      .replace(/^Eve:\s*/i, "")
-      .replace(/\.$/, "") + ".";
-
-    return NextResponse.json({ comment });
-  } catch {
-    return NextResponse.json({ comment: "" });
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("[/api/comment]", error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "The comment request is invalid." }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Eve could not prepare a comment right now." }, { status: 503 });
   }
 }
