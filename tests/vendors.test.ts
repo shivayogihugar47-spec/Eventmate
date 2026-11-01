@@ -50,7 +50,7 @@ describe("Local vendor search API", () => {
       source: "OpenStreetMap",
       results: [{
         name: "Example Banquet Hall",
-        category: "Event venue",
+        category: "Venues",
         address: "Market Road, Pune",
         phone: "+91 1234567890",
         website: "https://example.test",
@@ -59,6 +59,45 @@ describe("Local vendor search API", () => {
     });
     expect(String(fetchMock.mock.calls[0][0])).toContain("nominatim.openstreetmap.org");
     expect(String(fetchMock.mock.calls[1][0])).toContain("overpass-api.de");
+  });
+
+  it("classifies several kinds of event vendors instead of returning restaurants only", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{
+        lat: "15.8497",
+        lon: "74.4977",
+        display_name: "Belagavi, Karnataka, India",
+      }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        elements: [
+          { type:"node", id:1, tags:{name:"Garden Venue", tourism:"hotel"} },
+          { type:"node", id:2, tags:{name:"Celebration Caterers", craft:"caterer"} },
+          { type:"node", id:3, tags:{name:"Petal Decor", shop:"florist"} },
+          { type:"node", id:4, tags:{name:"Moments Studio", craft:"photographer"} },
+          { type:"node", id:5, tags:{name:"Rhythm Events", amenity:"music_venue"} },
+          { type:"node", id:6, tags:{name:"Celebration Cakes", shop:"bakery"} },
+          { type:"node", id:7, tags:{name:"The Grand Restaurant", amenity:"restaurant"} },
+        ],
+      }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await GET(new Request("https://eventmate.test/api/vendors?city=Belagavi"));
+    const result = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(result.results.map((vendor: {category:string}) => vendor.category)).toEqual([
+      "Venues",
+      "Caterers",
+      "Decorators & florists",
+      "Photographers",
+      "Entertainment",
+      "Bakeries",
+      "Restaurants",
+    ]);
+    const overpassUrl = String(fetchMock.mock.calls[1][0]);
+    expect(decodeURIComponent(overpassUrl)).toContain("around:25000");
+    expect(decodeURIComponent(overpassUrl)).toContain("event_management");
+    expect(decodeURIComponent(overpassUrl)).toContain("decorator");
   });
 
   it("returns a useful not-found response for an unknown city", async () => {

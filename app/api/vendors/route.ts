@@ -19,13 +19,27 @@ const OverpassSchema = z.object({
 });
 
 function vendorCategory(tags: Record<string, string>): string | null {
-  if (["events_venue", "conference_centre", "community_centre", "banquet_hall"].includes(tags.amenity ?? "")) return "Event venue";
-  if (tags.craft === "caterer" || tags.shop === "caterer") return "Caterer";
-  if (tags.amenity === "restaurant") return "Restaurant";
-  if (tags.shop === "florist" || tags.craft === "florist") return "Florist & decor";
-  if (tags.craft === "photographer" || tags.shop === "photo") return "Photography";
-  if (tags.shop === "bakery") return "Bakery";
-  if (["theatre", "music_venue", "nightclub"].includes(tags.amenity ?? "")) return "Entertainment";
+  if (
+    ["events_venue", "conference_centre", "community_centre", "banquet_hall", "place_of_worship"].includes(tags.amenity ?? "")
+    || ["hotel", "guest_house"].includes(tags.tourism ?? "")
+    || ["park", "garden"].includes(tags.leisure ?? "")
+  ) return "Venues";
+  if (tags.craft === "caterer" || tags.shop === "caterer" || tags.office === "catering") return "Caterers";
+  if (tags.amenity === "restaurant") return "Restaurants";
+  if (
+    tags.shop === "florist"
+    || tags.craft === "florist"
+    || tags.craft === "decorator"
+    || tags.craft === "interior_decorator"
+    || tags.shop === "interior_decoration"
+  ) return "Decorators & florists";
+  if (tags.craft === "photographer" || tags.shop === "photo" || tags.office === "photographer") return "Photographers";
+  if (tags.shop === "bakery" || tags.craft === "baker") return "Bakeries";
+  if (["theatre", "music_venue", "nightclub", "arts_centre"].includes(tags.amenity ?? "") || tags.craft === "musician") return "Entertainment";
+  if (tags.office === "event_management" || tags.office === "wedding_planner" || tags.craft === "event_planner") return "Event planners";
+  if (tags.shop === "party" || tags.shop === "rental" || tags.shop === "equipment_rental") return "Rentals & party supplies";
+  if (tags.shop === "beauty" || tags.shop === "hairdresser" || tags.shop === "beauty_salon") return "Beauty & styling";
+  if (tags.amenity === "car_rental" || tags.shop === "car_rental") return "Transport";
   return null;
 }
 
@@ -64,11 +78,14 @@ export async function GET(request: Request) {
     const lon = Number(place.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("City lookup returned invalid coordinates.");
 
-    const around = `around:15000,${lat},${lon}`;
+    const around = `around:25000,${lat},${lon}`;
     const query = `[out:json][timeout:25];(` +
-      `nwr(${around})["name"]["amenity"~"^(events_venue|conference_centre|community_centre|banquet_hall|restaurant|theatre|music_venue|nightclub)$"];` +
-      `nwr(${around})["name"]["shop"~"^(caterer|florist|photo|bakery)$"];` +
-      `nwr(${around})["name"]["craft"~"^(caterer|florist|photographer)$"];` +
+      `nwr(${around})["name"]["amenity"~"^(events_venue|conference_centre|community_centre|banquet_hall|place_of_worship|restaurant|theatre|music_venue|nightclub|arts_centre|car_rental)$"];` +
+      `nwr(${around})["name"]["tourism"~"^(hotel|guest_house)$"];` +
+      `nwr(${around})["name"]["leisure"~"^(park|garden)$"];` +
+      `nwr(${around})["name"]["shop"~"^(caterer|florist|photo|bakery|party|rental|equipment_rental|beauty|hairdresser|beauty_salon|car_rental|interior_decoration|event_planner)$"];` +
+      `nwr(${around})["name"]["craft"~"^(caterer|florist|photographer|decorator|interior_decorator|baker|musician|event_planner)$"];` +
+      `nwr(${around})["name"]["office"~"^(catering|photographer|event_management|wedding_planner|event_planner)$"];` +
       `);out center;`;
     const overpassUrl = new URL("https://overpass-api.de/api/interpreter");
     overpassUrl.searchParams.set("data", query);

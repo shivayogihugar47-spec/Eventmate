@@ -402,6 +402,21 @@ interface LocalVendor {
   mapUrl: string;
 }
 
+const VENDOR_CATEGORIES = [
+  {label:"All", search:"event vendors"},
+  {label:"Venues", search:"wedding and event venues"},
+  {label:"Caterers", search:"event caterers"},
+  {label:"Decorators & florists", search:"event decorators and wedding florists"},
+  {label:"Photographers", search:"event photographers"},
+  {label:"Entertainment", search:"event entertainment DJs and bands"},
+  {label:"Event planners", search:"event planners and wedding planners"},
+  {label:"Bakeries", search:"custom cake bakeries"},
+  {label:"Beauty & styling", search:"bridal makeup artists and hair stylists"},
+  {label:"Rentals & party supplies", search:"event furniture and party equipment rentals"},
+  {label:"Transport", search:"event transport and car rentals"},
+  {label:"Restaurants", search:"restaurants for private events"},
+] as const;
+
 function VendorsSection({ city: initialCity }:{ city:string }) {
   const [city, setCity] = useState(initialCity);
   const [searchedCity, setSearchedCity] = useState("");
@@ -435,10 +450,11 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
     void search(initialCity);
   }, [initialCity, search]);
 
-  const categories = ["All", ...Array.from(new Set(vendors.map((vendor) => vendor.category)))];
   const visibleVendors = activeCategory === "All"
     ? vendors
     : vendors.filter((vendor) => vendor.category === activeCategory);
+  const searchUrl = (category: typeof VENDOR_CATEGORIES[number]) =>
+    `https://www.google.com/maps/search/${encodeURIComponent(`${category.search} in ${searchedCity}`)}`;
 
   return (
     <div className="space-y-5">
@@ -475,7 +491,7 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
         </div>
         <div className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-[#6B756D]">
           <Store size={13} className="mt-0.5 shrink-0 text-[#A77D2B]"/>
-          <p>Real place listings near the city center, sourced from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="font-bold underline underline-offset-2">OpenStreetMap contributors</a>. Listings may be incomplete—confirm services, availability, and pricing directly.</p>
+          <p>Real place listings within about 25 km of the city center, sourced from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="font-bold underline underline-offset-2">OpenStreetMap contributors</a>. Coverage varies; use the category-specific live searches below for more options and confirm services, availability, and pricing directly.</p>
         </div>
       </div>
 
@@ -491,38 +507,43 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
         </div>
       )}
 
-      {!loading && !error && vendors.length > 0 && (
+      {!loading && !error && searchedCity && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-display text-lg font-extrabold text-[#202B27]">Local options in {searchedCity}</h3>
-              <p className="mt-0.5 text-xs text-[#778078]">{vendors.length} mapped places · around 15 km from the city center</p>
+              <h3 className="font-display text-lg font-extrabold text-[#202B27]">Explore event vendors in {searchedCity}</h3>
+              <p className="mt-0.5 text-xs text-[#778078]">{vendors.length} mapped places · within around 25 km of the city center</p>
             </div>
             <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#52645A] underline underline-offset-2">© OpenStreetMap contributors</a>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {categories.map((category) => (
+            {VENDOR_CATEGORIES.map((category) => {
+              const count = category.label === "All"
+                ? vendors.length
+                : vendors.filter((vendor) => vendor.category === category.label).length;
+              return (
               <button
                 type="button"
-                key={category}
-                onClick={() => setActiveCategory(category)}
+                key={category.label}
+                onClick={() => setActiveCategory(category.label)}
                 className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
-                  activeCategory === category
+                  activeCategory === category.label
                     ? "bg-[#214E43] text-white"
                     : "border border-[#E5E0D3] bg-white text-[#52645A] hover:border-[#A77D2B]/50"
                 }`}
               >
-                {category === "All" ? `All (${vendors.length})` : category}
+                {category.label} ({count})
               </button>
-            ))}
+            );})}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {visibleVendors.map((vendor, index) => {
-              const I = vendor.category.includes("Florist") ? Flower2
-                : vendor.category === "Photography" ? Camera
-                : vendor.category === "Bakery" ? Cake
+          {visibleVendors.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {visibleVendors.map((vendor, index) => {
+              const I = vendor.category.toLowerCase().includes("florist") || vendor.category.includes("Decorator") ? Flower2
+                : vendor.category === "Photographers" ? Camera
+                : vendor.category === "Bakeries" ? Cake
                 : vendor.category === "Entertainment" ? Music
-                : vendor.category === "Restaurant" || vendor.category === "Caterer" ? Utensils
+                : vendor.category === "Restaurants" || vendor.category === "Caterers" ? Utensils
                 : Building2;
               const palette = PAL[index % PAL.length];
               return (
@@ -560,25 +581,39 @@ function VendorsSection({ city: initialCity }:{ city:string }) {
                   </div>
                 </motion.article>
               );
-            })}
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[#E8E6DE] bg-[#FAFAF6] px-5 py-7 text-center">
+              <Store size={23} className="mx-auto text-[#A77D2B]"/>
+              <h4 className="mt-2 font-display font-extrabold text-[#202B27]">
+                {activeCategory === "All" ? "No mapped vendors found nearby" : `No mapped ${activeCategory.toLowerCase()} found nearby`}
+              </h4>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-[#778078]">
+                OpenStreetMap may not have this type of business mapped in {searchedCity}. Search local listings to see more options.
+              </p>
+              <a
+                href={searchUrl(VENDOR_CATEGORIES.find((category) => category.label === activeCategory) ?? VENDOR_CATEGORIES[0])}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#214E43] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#173D34]"
+              >
+                Search {activeCategory === "All" ? "event vendors" : activeCategory.toLowerCase()} in {searchedCity} <ExternalLink size={13}/>
+              </a>
+            </div>
+          )}
+          <div>
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#7D877F]">More vendor categories</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {VENDOR_CATEGORIES.filter((category) => category.label !== "All").map((category) => (
+                <a key={category.label} href={searchUrl(category)} target="_blank" rel="noreferrer"
+                  className="flex items-center justify-between gap-2 rounded-xl border border-[#E7E4DB] bg-white px-3 py-2.5 text-xs font-bold text-[#42564A] transition hover:border-[#B9C9BD] hover:bg-[#F7F9F5]">
+                  <span>{category.label}</span><ExternalLink size={13} className="shrink-0 text-[#A77D2B]"/>
+                </a>
+              ))}
+            </div>
           </div>
         </>
-      )}
-
-      {!loading && !error && searchedCity && vendors.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-[#D8D6CD] bg-white px-5 py-10 text-center">
-          <Store size={24} className="mx-auto text-[#A77D2B]"/>
-          <h3 className="mt-3 font-display font-extrabold text-[#202B27]">No mapped listings found nearby</h3>
-          <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-[#778078]">Try a nearby city or broaden your search. OpenStreetMap may not have complete business coverage in this area.</p>
-          <a
-            href={`https://www.google.com/maps/search/event+vendors+${encodeURIComponent(searchedCity)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#D8D6CD] px-4 py-2.5 text-xs font-bold text-[#315C4C] hover:bg-[#F6F7F2]"
-          >
-            Search more places on Google Maps <ExternalLink size={13}/>
-          </a>
-        </div>
       )}
     </div>
   );
