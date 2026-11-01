@@ -18,3 +18,41 @@ export type VendorCategoryId = (typeof VENDOR_CATEGORIES)[number]["id"];
 export function getVendorCategory(id: string) {
   return VENDOR_CATEGORIES.find((category) => category.id === id);
 }
+
+export function getVendorSearchLinks(city: string, categoryId: string) {
+  const category = getVendorCategory(categoryId);
+  const normalizedCity = city.trim();
+  if (!category || !normalizedCity) return [];
+
+  const query = `${category.search} in ${normalizedCity}`;
+  const directoryQuery = (domain: string) => `site:${domain} ${query}`;
+  const googleSearch = (searchQuery: string) =>
+    `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+
+  return [
+    {
+      id: "web",
+      label: "Search the web",
+      description: "Browse general search results",
+      url: googleSearch(query),
+    },
+    {
+      id: "maps",
+      label: "Search Google Maps",
+      description: "Explore nearby places on a map",
+      url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
+    },
+    {
+      id: "justdial",
+      label: "Search Justdial",
+      description: "Find local business listings",
+      url: googleSearch(directoryQuery("justdial.com")),
+    },
+    {
+      id: "wedmegood",
+      label: "Search WedMeGood",
+      description: "Browse wedding vendor listings",
+      url: googleSearch(directoryQuery("wedmegood.com")),
+    },
+  ];
+}

@@ -71,17 +71,9 @@ CHANGE -> INTAKE -> IMPACT ENGINE -> OPTION GENERATOR -> VERIFIER
 
 Task owners use expiring, unguessable links scoped to their assigned tasks. Their Done and Delay actions use the same event versioning and verification rules. If the network drops, organizer updates are queued locally and retried after reconnecting.
 
-## Google Maps vendor search
+## Vendor search links
 
-The plan-writing model is instructed not to invent real business names or claim vendor availability. The Vendors tab searches the selected city with Google Places API (New) for venues, caterers, decorators and florists, photographers, entertainment, event planners, bakeries, beauty services, rentals, transport, and restaurants. Place cards can show Google ratings/review counts, address, open status, website, phone, and a Google Maps link when Google has those details. Results are not endorsements; verify the services, event-date availability, and pricing directly.
-
-To enable live in-app results:
-
-1. In Google Cloud Console, enable billing and **Places API (New)** for a project.
-2. Create an API key restricted to the Places API. Keep it server-side; do not use a `NEXT_PUBLIC_` prefix or commit the key.
-3. Add `GOOGLE_MAPS_API_KEY=...` to `.env.local` for local development and restart Next.js. Set the same variable in the production host's server environment.
-
-Without this key, the vendor section explains the setup requirement and provides category-specific Google Maps search links. Place search calls are not cached by the app.
+The Vendors tab creates city- and category-specific search links for the web, Google Maps, Justdial, and WedMeGood. It requires no API key or account setup and does not fetch or republish third-party listings. Justdial and WedMeGood links use a site-filtered web search. Search results are external and are not verified by EventMate; confirm services, availability, and pricing directly with each business.
 
 ---
 
