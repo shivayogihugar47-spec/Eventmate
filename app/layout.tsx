@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     description: "Plans your celebration. Runs it too. Plan the day, budget, vendors, and event operations with Jashn.",
     images: [
       {
-        url: "/brand/jashn-logo.png",
+        url: "/jashn-logo.png",
         alt: "Jashn — Plans your celebration. Runs it too.",
       },
     ],
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Jashn — Plans your celebration. Runs it too.",
     description: "Plans your celebration. Runs it too. Plan the day, budget, vendors, and event operations with Jashn.",
-    images: ["/brand/jashn-logo.png"],
+    images: ["/jashn-logo.png"],
   },
 };
 

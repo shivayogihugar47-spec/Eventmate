@@ -105,7 +105,7 @@ Optional local/integration variables:
 
 ### Brand assets
 
-Place `jashn-logo.png` and `jashn-icon.png` in `public/brand/`. The logo is used in the navigation and landing hero; the icon is used for browser and Apple touch icons.
+The logo at `public/jashn-logo.png` is used in the navigation, landing hero, and social previews. Add `jashn-icon.png` at `public/brand/jashn-icon.png` for the browser favicon and Apple touch icon.
 
 ### Vercel deployment
 

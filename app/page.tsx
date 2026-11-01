@@ -813,7 +813,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
             </div>
           </div>
           <Image
-            src="/brand/jashn-logo.png"
+            src="/jashn-logo.png"
             alt="Jashn — Plans your celebration. Runs it too."
             width={560}
             height={180}
@@ -880,7 +880,7 @@ function Landing({ onStart, user, events, eventsLoading, eventsError, onSignIn, 
         {/* Left text */}
         <div className="text-center lg:text-left">
           <Image
-            src="/brand/jashn-logo.png"
+            src="/jashn-logo.png"
             alt="Jashn — Plans your celebration. Runs it too."
             width={560}
             height={180}
